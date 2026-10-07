@@ -32,14 +32,14 @@ pip install -r requirements.txt
 
 # Lendo dados com Data Reader
 
-Para garantir o cumprimento do critério de split dos dados e evitar corrompimento deles, procure nunca acessar diretamente a pasta `dados`. Ao invés, use a classe `get_data.reader.DataReader`. Abaixo, alguns exemplos de como utilizar a classe para dados de treino e validação:
+Para garantir o cumprimento do critério de split dos dados e evitar corrompimento deles, procure nunca acessar diretamente a pasta `dados`. Ao invés, use a classe `src.data.reader.DataReader`. Abaixo, alguns exemplos de como utilizar a classe para dados de treino e validação:
 
 ### Diagnóstico (ACF/PACF) — quem cuida do item 4
 
 ```python
 import matplotlib.pyplot as plt
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-from get_data.reader import DataReader, SERIES
+from src.data.reader import DataReader, SERIES
 
 train = DataReader("train")
 
@@ -58,7 +58,7 @@ for nome in SERIES:
 ### Baseline media — quem cuida dos quatro baselines
 
 ```python
-from get_data.reader import DataReader, SERIES
+from src.data.reader import DataReader, SERIES
 
 train = DataReader("train")
 valid = DataReader("validation")
@@ -79,7 +79,7 @@ print(previsoes[:3])
 
 ```python
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from get_data.reader import DataReader
+from src.data.reader import DataReader
 
 train = DataReader("train")
 valid = DataReader("validation")

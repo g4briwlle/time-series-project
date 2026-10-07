@@ -4,3 +4,7 @@ venv
 .virtualenv
 virtualenv
 env
+
+# Project files
+# unzipped project requirements
+projeto-task1

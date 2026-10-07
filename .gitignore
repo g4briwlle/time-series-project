@@ -1,3 +1,4 @@
+# ---- Python files ----------------------------------------------------
 # Python venv
 .venv
 venv
@@ -5,6 +6,8 @@ venv
 virtualenv
 env
 
-# Project files
+__pycache__
+
+# ---- Project files ---------------------------------------------------
 # unzipped project requirements
 projeto-task1

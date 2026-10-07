@@ -30,7 +30,9 @@ Para facilidade, vamos usar apenas o pip para instalar as dependências listadas
 pip install -r requirements.txt
 ```
 
-# Exemplo de uso do Data Reader
+# Lendo dados com Data Reader
+
+Para garantir o cumprimento do critério de split dos dados e evitar corrompimento deles, procure nunca acessar diretamente a pasta `dados`. Ao invés, use a classe `get_data.reader.DataReader`. Abaixo, alguns exemplos de como utilizar a classe para dados de treino e validação:
 
 ### Diagnóstico (ACF/PACF) — quem cuida do item 4
 

@@ -55,24 +55,30 @@ for nome in SERIES:
     fig.savefig(f"figuras/diagnostico_{nome}.png", dpi=120)
 ```
 
-### Baseline media — quem cuida dos quatro baselines
+### Baselines (média, naive, naive sazonal e drift)
+
+Implementados em `src/baselines.py`. Da raiz do repo:
+
+```bash
+python -m src.baselines
+```
+
+Isso gera em `outputs/`:
+
+- `previsoes_baselines.csv`: previsões dos 28 dias de validação para as três séries, com as colunas de `previsoes_validacao.csv` (`date`, `series`, `modelo`, `yhat`) e `modelo` em `media`, `naive`, `naive_sazonal`, `drift`;
+- `naive_sazonal_insample.csv`: MAE e RMSE in-sample do naive sazonal (m = 7) no treino. O `mae` é a escala do MASE.
+
+Para usar no `run.py`:
 
 ```python
-from src.data.reader import DataReader, SERIES
+from src.baselines import prever_baselines, naive_sazonal_insample
+from src.data.reader import DataReader
 
 train = DataReader("train")
 valid = DataReader("validation")
 
-previsoes = []
-for nome in SERIES:
-    y_train = train.get_series(nome)
-    yhat = y_train.mean()
-    for d in valid.get_dates():
-        previsoes.append(
-            {"date": d, "series": nome, "modelo": "media", "yhat": yhat}
-        )
-
-print(previsoes[:3])
+previsoes = prever_baselines(train, valid)   # date, series, modelo, yhat
+escala_mase = naive_sazonal_insample(train)  # series, mae, rmse
 ```
 
 ### ARIMA/SARIMA — quem cuida do modelo

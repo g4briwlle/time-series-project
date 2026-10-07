@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 
 
-BASE_PATH = Path(__file__).resolve().parent.parent # starts in get_data and go one up
+BASE_PATH = Path(__file__).resolve().parent.parent.parent # starts in data and go src/ and then root
 DATA_PATH = BASE_PATH / 'dados'
 TRAIN_PATH = DATA_PATH / 'treino.csv'
 VALIDATION_PATH = DATA_PATH / 'validacao.csv'

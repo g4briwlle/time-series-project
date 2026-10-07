@@ -77,8 +77,8 @@ from src.data.reader import DataReader
 train = DataReader("train")
 valid = DataReader("validation")
 
-previsoes = prever_baselines(train, valid)   # date, series, modelo, yhat
-escala_mase = naive_sazonal_insample(train)  # series, mae, rmse
+previsoes = prever_baselines(train, valid.get_dates())  # date, series, modelo, yhat
+escala_mase = naive_sazonal_insample(train)             # series, mae, rmse
 ```
 
 ### ARIMA/SARIMA — quem cuida do modelo

@@ -1,16 +1,4 @@
 # src/baselines.py
-"""
-Baselines da aula 20/08 para as três séries, no horizonte de validação
-(28 dias): média, naive, naive sazonal (m = 7) e drift.
-
-As funções de previsão recebem só a série de treino e o horizonte h, então
-nenhuma delas tem acesso ao y da validação. Da validação usamos apenas as
-datas, via DataReader.
-
-Rode a partir da raiz do repo:
-
-    python -m src.baselines
-"""
 import numpy as np
 import pandas as pd
 
@@ -55,15 +43,15 @@ BASELINES = {
 
 # ---------- Saídas ----------
 
-def prever_baselines(train: DataReader, valid: DataReader) -> pd.DataFrame:
+def prever_baselines(train: DataReader, datas: pd.DatetimeIndex) -> pd.DataFrame:
     """
-    Previsões dos quatro baselines para as três séries, no formato de
-    previsoes_validacao.csv: colunas 'date', 'series', 'modelo', 'yhat'.
+    Previsões dos quatro baselines para as três séries nas `datas` da
+    validação, no formato de previsoes_validacao.csv: colunas 'date',
+    'series', 'modelo', 'yhat'. Da validação entram só as datas, nunca o y.
     """
-    datas = valid.get_dates()
     # naive sazonal e drift contam h a partir do último dia do treino
     if datas[0] != train.get_dates()[-1] + pd.Timedelta(days=1):
-        raise ValueError("a validação deve começar no dia seguinte ao fim do treino.")
+        raise ValueError("as datas devem começar no dia seguinte ao fim do treino.")
 
     previsoes = []
     for nome in SERIES:
@@ -104,6 +92,6 @@ if __name__ == "__main__":
     valid = DataReader("validation")
 
     OUTPUT_PATH.mkdir(exist_ok=True)
-    prever_baselines(train, valid).to_csv(OUTPUT_PATH / "previsoes_baselines.csv", index=False)
+    prever_baselines(train, valid.get_dates()).to_csv(OUTPUT_PATH / "previsoes_baselines.csv", index=False)
     naive_sazonal_insample(train).to_csv(OUTPUT_PATH / "naive_sazonal_insample.csv", index=False)
     print(f"Previsões dos baselines e escala do MASE salvas em {OUTPUT_PATH}")

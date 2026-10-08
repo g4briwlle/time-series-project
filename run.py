@@ -8,6 +8,7 @@ from typing import Callable
 from pathlib import Path
 
 from src.data.reader import DataReader
+from src.baselines import prever_baselines
 
 BASE_PATH = Path(__file__).resolve().parent
 
@@ -148,20 +149,22 @@ def assert_val_pred_df(val_pred_df: pd.DataFrame):
     assert (
         ('arima' in models) or
         ('sarima' in models)
-    ), "Não foi detectado modelo SARIMA ou ARIMA em metrics.csv"
+    ), "Dataframe de previsões não contém modelo 'arima' ou 'sarima'"
     
 
 def generate_validation_predictions_file(
-    validation_predictions_generating_function: Callable[[pd.DataFrame], pd.DataFrame]
+    validation_predictions_generating_function: Callable,
+    *args
 ):
-    validation_data = DataReader('validation').to_long()
-    
-    val_pred_df = validation_predictions_generating_function(validation_data)
+    val_pred_df = validation_predictions_generating_function(*args)
     
     assert_val_pred_df(val_pred_df)
     
     val_pred_df.to_csv(PREDICTIONS_PATH, index=False)
 
 if __name__ == "__main__":
-    generate_metrics_file(mock_metrics_generating_function)
-    generate_validation_predictions_file(mock_predictions_generating_function)
+    # generate_metrics_file(mock_metrics_generating_function)
+    # generate_validation_predictions_file(mock_predictions_generating_function)
+    
+    # With the actual baselines
+    generate_validation_predictions_file(prever_baselines, DataReader('train'), DataReader('validation').get_dates())

@@ -74,3 +74,21 @@ yhat = res.forecast(steps=h)
 yhat.index = valid.get_dates()
 print(yhat.head())
 ```
+
+Isso gera em `outputs/`:
+
+- `previsoes_baselines.csv`: previsões dos 28 dias de validação para as três séries, com as colunas de `previsoes_validacao.csv` (`date`, `series`, `modelo`, `yhat`) e `modelo` em `media`, `naive`, `naive_sazonal`, `drift`;
+- `naive_sazonal_insample.csv`: MAE e RMSE in-sample do naive sazonal (m = 7) no treino. O `mae` é a escala do MASE.
+
+Para usar no `run.py`:
+
+```python
+from src.baselines import prever_baselines, naive_sazonal_insample
+from src.data.reader import DataReader
+
+train = DataReader("train")
+valid = DataReader("validation")
+
+previsoes = prever_baselines(train, valid.get_dates())  # date, series, modelo, yhat
+escala_mase = naive_sazonal_insample(train)             # series, mae, rmse
+```

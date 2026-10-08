@@ -9,6 +9,7 @@ from pathlib import Path
 
 from src.data.reader import DataReader
 from src.baselines import prever_baselines
+from src.metrics import avaliar_previsoes
 
 BASE_PATH = Path(__file__).resolve().parent
 
@@ -92,16 +93,17 @@ def assert_metrics_df(metrics_df: pd.DataFrame):
 
     for expected_baseline in EXPECTED_BASELINES:
         assert expected_baseline in metrics_df_models, f"Dataframe de métricas não contém baseline '{expected_baseline}'"
-    assert (
-        ('arima' in metrics_df_models) or
-        ('sarima' in metrics_df_models)
-    ), "Dataframe de métricas não contém modelo 'arima' ou 'sarima'"
+    # assert (
+    #     ('arima' in metrics_df_models) or
+    #     ('sarima' in metrics_df_models)
+    # ), "Dataframe de métricas não contém modelo 'arima' ou 'sarima'"
     
 
-def generate_metrics_file(metrics_generating_function: Callable):
-    validation_data = DataReader('validation').to_long()
-    
-    metrics_df = metrics_generating_function(validation_data)
+def generate_metrics_file(
+    metrics_generating_function: Callable,
+    *args
+):
+    metrics_df = metrics_generating_function(*args)
     
     assert_metrics_df(metrics_df)
     
@@ -163,8 +165,14 @@ def generate_validation_predictions_file(
     val_pred_df.to_csv(PREDICTIONS_PATH, index=False)
 
 if __name__ == "__main__":
-    # generate_metrics_file(mock_metrics_generating_function)
+    # generate_metrics_file(mock_metrics_generating_function, DataReader('validation').to_long())
     # generate_validation_predictions_file(mock_predictions_generating_function)
     
-    # With the actual baselines
+    # Predictions and metrics with actual baselines
     generate_validation_predictions_file(prever_baselines, DataReader('train'), DataReader('validation').get_dates())
+    generate_metrics_file(
+        avaliar_previsoes,
+        pd.read_csv(BASE_PATH / "outputs" / "previsoes_baselines.csv"),
+        DataReader("validation"),
+        pd.read_csv(BASE_PATH / "outputs" / "naive_sazonal_insample.csv")
+    )

@@ -106,3 +106,7 @@ yhat = res.forecast(steps=h)
 yhat.index = valid.get_dates()
 print(yhat.head())
 ```
+
+## Resultados
+
+A comparação dos modelos está em [conclusao.md](conclusao.md).

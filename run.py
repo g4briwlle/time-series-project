@@ -93,10 +93,10 @@ def assert_metrics_df(metrics_df: pd.DataFrame):
 
     for expected_baseline in EXPECTED_BASELINES:
         assert expected_baseline in metrics_df_models, f"Dataframe de métricas não contém baseline '{expected_baseline}'"
-    # assert (
-    #     ('arima' in metrics_df_models) or
-    #     ('sarima' in metrics_df_models)
-    # ), "Dataframe de métricas não contém modelo 'arima' ou 'sarima'"
+    assert (
+        ('arima' in metrics_df_models) or
+        ('sarima' in metrics_df_models)
+    ), "Dataframe de métricas não contém modelo 'arima' ou 'sarima'"
     
 
 def generate_metrics_file(

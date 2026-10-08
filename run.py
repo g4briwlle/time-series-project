@@ -70,8 +70,8 @@ def mock_predictions_generating_function(validation_df: pd.DataFrame) -> pd.Data
     
     return fake_predictions_df
 
-#  --- metrics.csv -----------------------------------------------------
-METRICS_PATH = BASE_PATH / 'metrics.csv'
+#  --- metricas.csv -----------------------------------------------------
+METRICS_PATH = BASE_PATH / 'metricas.csv'
 EXPECTED_METRICS_COLUMNS = [
     'series',
     'modelo',

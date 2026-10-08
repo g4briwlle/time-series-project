@@ -59,10 +59,18 @@ def avaliar_previsoes(previsoes, validacao, escalas):
 
 
 if __name__ == "__main__":
-    metricas = avaliar_previsoes(
+    previsoes = pd.concat([
         pd.read_csv(BASE_PATH / "outputs" / "previsoes_baselines.csv"),
+        pd.read_csv(BASE_PATH / "outputs" / "previsoes_sarima.csv"),
+    ], ignore_index=True)
+
+    previsoes.to_csv(BASE_PATH / "previsoes_validacao.csv", index=False)
+
+    metricas = avaliar_previsoes(
+        previsoes,
         DataReader("validation"),
         pd.read_csv(BASE_PATH / "outputs" / "naive_sazonal_insample.csv"),
     )
+
     metricas.to_csv(BASE_PATH / "metricas.csv", index=False)
     print(metricas.to_string(index=False))

@@ -10,6 +10,7 @@ from pathlib import Path
 from src.data.reader import DataReader
 from src.baselines import prever_baselines
 from src.metrics import avaliar_previsoes
+from src.sarima import ajustar_e_prever_sarima
 
 BASE_PATH = Path(__file__).resolve().parent
 
@@ -169,10 +170,24 @@ if __name__ == "__main__":
     # generate_validation_predictions_file(mock_predictions_generating_function)
     
     # Predictions and metrics with actual baselines
-    generate_validation_predictions_file(prever_baselines, DataReader('train'), DataReader('validation').get_dates())
+    
+    def _all_predictions(train: DataReader, datas_validacao: pd.DatetimeIndex):
+        baselines_predictions = prever_baselines(train, datas_validacao)
+        sarima_predictions = ajustar_e_prever_sarima(train, datas_validacao)
+        
+        all_predictions = pd.concat([baselines_predictions, sarima_predictions])
+        
+        return all_predictions
+    
+    generate_validation_predictions_file(_all_predictions, DataReader('train'), DataReader('validation').get_dates())
+    
+    previsoes = pd.concat([
+        pd.read_csv(BASE_PATH / "outputs" / "previsoes_baselines.csv"),
+        pd.read_csv(BASE_PATH / "outputs" / "previsoes_sarima.csv"),
+    ], ignore_index=True)
     generate_metrics_file(
         avaliar_previsoes,
-        pd.read_csv(BASE_PATH / "outputs" / "previsoes_baselines.csv"),
+        previsoes,
         DataReader("validation"),
-        pd.read_csv(BASE_PATH / "outputs" / "naive_sazonal_insample.csv")
+        pd.read_csv(BASE_PATH / "outputs" / "naive_sazonal_insample.csv"),
     )

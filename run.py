@@ -1,193 +1,173 @@
 """
-Final script of project that should produce the final metrics.csv as a requirement.
-"""
-import pandas as pd
-import numpy as np
+Script final do projeto: gera previsoes_validacao.csv e metricas.csv na raiz.
 
-from typing import Callable
+    python run.py                    refaz os modelos da Task 2 e consolida
+    python run.py --so-consolidar    consolida os CSVs de previsões que já existem
+
+As previsões da Task 1 (quatro baselines e SARIMA) entram como foram entregues,
+em part1/. As métricas são sempre recalculadas aqui a partir do yhat, com a
+escala do MASE vinda do treino (MAE in-sample do naive sazonal, período 7).
+"""
+import argparse
+import subprocess
+import sys
 from pathlib import Path
 
-from src.data.reader import DataReader
-from src.baselines import prever_baselines
-from src.metrics import avaliar_previsoes
-from src.sarima import ajustar_e_prever_sarima
+import numpy as np
+import pandas as pd
 
 BASE_PATH = Path(__file__).resolve().parent
+PART1 = BASE_PATH / "part1"
+PART2 = BASE_PATH / "part2"
 
-SERIES = ("store_total", "FOODS", "HOBBIES")
-EXPECTED_BASELINES = [
-    'naive',
-    'naive_sazonal',
-    'media',
-    'drift',
+sys.path.insert(0, str(PART1))  # `src` é o pacote da Task 1
+
+from src.baselines import naive_sazonal_insample
+from src.data._config import VALIDATION_END, VALIDATION_START
+from src.data.reader import DataReader, validate_all_splits
+from src.metrics import avaliar_previsoes
+
+PREDICTIONS_PATH = BASE_PATH / "previsoes_validacao.csv"
+METRICS_PATH = BASE_PATH / "metricas.csv"
+
+PREDICTIONS_COLUMNS = ["date", "series", "modelo", "yhat"]
+
+# Task 1 como foi entregue: baselines e SARIMA. Não se refaz. Os CSVs de
+# part1/outputs são os que geraram part1/metricas.csv (part1/previsoes_validacao.csv
+# traz um SARIMA ajustado em outra instalação, com diferença de até 0,04 no yhat).
+TASK1_PREDICTIONS_PATHS = [
+    PART1 / "outputs" / "previsoes_baselines.csv",
+    PART1 / "outputs" / "previsoes_sarima.csv",
+]
+TASK1_METRICS_PATH = PART1 / "metricas.csv"
+
+# Scripts que geram as previsões da Task 2 e, para o pacote com imports
+# relativos (store_total), o módulo rodado da raiz.
+MODEL_SCRIPTS = [
+    PART2 / "src" / "model_direto_hobbies.py",
+    PART2 / "projeto-task2" / "linear_foods_model" / "linear_foods.py",
+]
+MODEL_MODULES = [
+    "part2.src.model_store_total.model_store_total",
 ]
 
-def mock_metrics_generating_function(validation_data: pd.DataFrame) -> pd.DataFrame:
-    print("Creating fake metrics dataframe for mock")
-    
-    fake_metrics_df = validation_data.copy()
-    
-    fake_metrics_df = fake_metrics_df.groupby('series')['y'].mean().reset_index()
-    
-    fake_metrics_df['mae'] = fake_metrics_df['y']
-    fake_metrics_df['rmse'] = fake_metrics_df['y']
-    fake_metrics_df['mase'] = fake_metrics_df['y']
-    
-    fake_metrics_df = fake_metrics_df.drop(columns=['y'])
-    
-    series = fake_metrics_df['series'].unique().tolist()
-    
-    baselines_and_arima = EXPECTED_BASELINES
-    baselines_and_arima.append('arima')
-    multiindex = pd.MultiIndex.from_product([series, baselines_and_arima], names=['series', 'modelo'])
-    
-    fake_metrics_df = (
-        fake_metrics_df.set_index('series')
-        .reindex(multiindex)
-        .reset_index()
+# CSV de previsões de cada classe, por série. No HOBBIES entra a estratégia
+# direta; os arquivos `recursivo_` não entram.
+TASK2_PREDICTIONS_PATHS = {
+    "linear": {
+        "FOODS": PART2 / "projeto-task2" / "linear_foods_model" / "previsoes_validacao_foods.csv",
+        "HOBBIES": PART2 / "outputs" / "previsoes_linear_direto_HOBBIES.csv",
+        "store_total": PART2 / "outputs" / "previsoes_linear_store_total.csv",
+    },
+}
+
+
+def assert_same_data():
+    """Os modelos da Task 2 leem part2/dados; os arquivos devem ser os do split da Task 1."""
+    for nome in ("treino.csv", "validacao.csv", "holdout_datas.csv"):
+        if (PART1 / "dados" / nome).read_bytes() != (PART2 / "dados" / nome).read_bytes():
+            raise ValueError(f"part2/dados/{nome} difere de part1/dados/{nome}.")
+
+
+def run_model_scripts():
+    comandos = [(script.relative_to(BASE_PATH), [str(script)]) for script in MODEL_SCRIPTS]
+    comandos += [(modulo, ["-m", modulo]) for modulo in MODEL_MODULES]
+    for nome, argumentos in comandos:
+        print(f"Rodando {nome}")
+        subprocess.run([sys.executable, *argumentos], cwd=BASE_PATH, check=True)
+
+
+def assert_predictions_df(df: pd.DataFrame, origem: str, serie: str | None = None):
+    """Uma previsão por data da validação, sem duplicatas, sem NaN."""
+    for coluna in PREDICTIONS_COLUMNS:
+        assert coluna in df.columns, f"{origem}: falta a coluna '{coluna}'."
+    if serie is not None:
+        assert (df["series"] == serie).all(), f"{origem}: esperava só a série '{serie}'."
+
+    esperadas = pd.date_range(VALIDATION_START, VALIDATION_END)
+    for (s, modelo), grupo in df.groupby(["series", "modelo"]):
+        datas = pd.DatetimeIndex(grupo["date"])
+        assert not datas.duplicated().any(), f"{origem}: datas duplicadas em {s}/{modelo}."
+        assert datas.sort_values().equals(esperadas), (
+            f"{origem}: {s}/{modelo} não cobre exatamente os 28 dias da validação."
+        )
+        assert np.isfinite(grupo["yhat"].to_numpy(dtype=float)).all(), (
+            f"{origem}: yhat com NaN ou infinito em {s}/{modelo}."
+        )
+
+
+def read_task1_predictions() -> pd.DataFrame:
+    previsoes = pd.concat(
+        [pd.read_csv(caminho, parse_dates=["date"])[PREDICTIONS_COLUMNS] for caminho in TASK1_PREDICTIONS_PATHS],
+        ignore_index=True,
     )
-    
-    for column in ['mae', 'rmse', 'mase']:
-        fake_metrics_df[column] = np.random.random(len(fake_metrics_df))
-    
-    return fake_metrics_df
+    assert_predictions_df(previsoes, "Task 1")
+    return previsoes
 
-def mock_predictions_generating_function(validation_df: pd.DataFrame) -> pd.DataFrame:
-    fake_predictions_df = validation_df.copy()
-    
-    multiindex_models = EXPECTED_BASELINES
-    multiindex_models.append('arima')
-    
-    series = fake_predictions_df['series'].unique().tolist()
-    dates = fake_predictions_df['date'].unique().tolist()
-    
-    multiindex = pd.MultiIndex.from_product([series, dates, multiindex_models], names=['series', 'date', 'modelo'])
-    
-    fake_predictions_df = (
-        fake_predictions_df.set_index(['series', 'date'])
-        .reindex(multiindex)
-        .reset_index()
+
+def read_task2_predictions() -> tuple[list[pd.DataFrame], list[str]]:
+    """Lê uma classe por série. O nome do modelo no CSV final é o da classe."""
+    previsoes, faltas = [], []
+    for classe, por_serie in TASK2_PREDICTIONS_PATHS.items():
+        for serie, caminho in por_serie.items():
+            if not caminho.is_file():
+                faltas.append(f"{classe} em {serie}: {caminho.relative_to(BASE_PATH)}")
+                continue
+            df = pd.read_csv(caminho, parse_dates=["date"])[PREDICTIONS_COLUMNS]
+            assert df["modelo"].str.strip().str.lower().eq(classe).all(), (
+                f"{caminho.name}: esperava o modelo '{classe}'."
+            )
+            df["modelo"] = classe
+            assert_predictions_df(df, caminho.name, serie)
+            previsoes.append(df)
+    return previsoes, faltas
+
+
+def assert_task1_metrics_unchanged(metricas: pd.DataFrame):
+    entregues = pd.read_csv(TASK1_METRICS_PATH)
+    novas = metricas.merge(entregues, on=["series", "modelo"], suffixes=("", "_task1"))
+    assert len(novas) == len(entregues), "faltam linhas da Task 1 em metricas.csv."
+    for coluna in ("mae", "rmse", "mase"):
+        assert np.allclose(novas[coluna], novas[f"{coluna}_task1"], rtol=1e-9), (
+            f"{coluna} da Task 1 mudou em metricas.csv."
+        )
+
+
+def generate_files() -> list[str]:
+    task2, faltas = read_task2_predictions()
+    previsoes = pd.concat([read_task1_predictions(), *task2], ignore_index=True)
+    assert not previsoes.duplicated(["date", "series", "modelo"]).any(), "previsões duplicadas."
+    previsoes.to_csv(PREDICTIONS_PATH, index=False)
+
+    escala = naive_sazonal_insample(DataReader("train"))
+    metricas = avaliar_previsoes(previsoes, DataReader("validation"), escala)
+    assert_task1_metrics_unchanged(metricas)
+    metricas.to_csv(METRICS_PATH, index=False)
+
+    print(metricas.to_string(index=False))
+    return faltas
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Gera previsoes_validacao.csv e metricas.csv.")
+    parser.add_argument(
+        "--so-consolidar",
+        action="store_true",
+        help="não refaz os modelos da Task 2; usa os CSVs de previsões que já existem",
     )
-    
-    fake_predictions_df = fake_predictions_df.rename(columns={'y': 'yhat'})
-    
-    return fake_predictions_df
+    args = parser.parse_args()
 
-#  --- metricas.csv -----------------------------------------------------
-METRICS_PATH = BASE_PATH / 'metricas.csv'
-EXPECTED_METRICS_COLUMNS = [
-    'series',
-    'modelo',
-    'mae',
-    'rmse',
-    'mase',
-]
+    validate_all_splits()
+    assert_same_data()
+    if not args.so_consolidar:
+        run_model_scripts()
 
-def assert_metrics_df(metrics_df: pd.DataFrame):
-    assert 'mae' in metrics_df.columns, "Dataframe de métricas não contem a coluna 'mae' necessária"
-    assert 'rmse' in metrics_df.columns, "Dataframe de métricas não contem a coluna 'rmse' necessária"
-    assert 'mase' in metrics_df.columns, "Dataframe de métricas não contem a coluna 'mase' necessária"
-    assert 'series' in metrics_df.columns, "Dataframe de métricas não contem a coluna 'series' necessária"
-    assert 'modelo' in metrics_df.columns, "Dataframe de métricas não contem a coluna 'modelo' necessária"
-    
-    metrics_df_models = metrics_df['modelo'].unique().tolist()
+    faltas = generate_files()
+    if faltas:
+        print("\nAVISO: faltam previsões da Task 2:")
+        for falta in faltas:
+            print(f"  {falta}")
 
-    for expected_baseline in EXPECTED_BASELINES:
-        assert expected_baseline in metrics_df_models, f"Dataframe de métricas não contém baseline '{expected_baseline}'"
-    assert (
-        ('arima' in metrics_df_models) or
-        ('sarima' in metrics_df_models)
-    ), "Dataframe de métricas não contém modelo 'arima' ou 'sarima'"
-    
-
-def generate_metrics_file(
-    metrics_generating_function: Callable,
-    *args
-):
-    metrics_df = metrics_generating_function(*args)
-    
-    assert_metrics_df(metrics_df)
-    
-    print(metrics_df)
-    
-    metrics_df.to_csv(METRICS_PATH, index=False)
-
-
-# --- previsoes_validacao.csv ------------------------------------------
-PREDICTIONS_PATH = BASE_PATH / 'previsoes_validacao.csv'
-EXPECTED_VAL_PRED_COLUMNS = (
-    'date',
-    'series',
-    'modelo',
-    'yhat',
-)
-
-def assert_val_pred_df(val_pred_df: pd.DataFrame):
-    # --- Columns ---
-    val_pred_columns = val_pred_df.columns.tolist()
-    
-    for expected_column in EXPECTED_VAL_PRED_COLUMNS:
-        assert expected_column in val_pred_columns, f"Dataframe de previsões não possui a coluna '{expected_column}' necessária."
-        
-    # --- series ---
-    val_pred_series = val_pred_df['series'].unique().tolist()
-    
-    for expected_series in SERIES:
-        assert expected_series in val_pred_series, f"Dataframe não possui a série '{expected_series}' necessária."
-    
-    # --- predictions count ---
-    validation_dates = DataReader('validation').get_dates()
-    validation_df_size = len(validation_dates)
-    
-    val_pred_num_dates = len(val_pred_df['date'].unique().tolist())
-    
-    assert val_pred_num_dates == validation_df_size, "Dataframe de previsões não tem o mesmo tamanho dos dados de validação."
-    
-    # --- models and baselines ---
-    models = val_pred_df['modelo'].unique().tolist()
-    
-    for expected_baseline in EXPECTED_BASELINES:
-        assert expected_baseline in models, f"Dataframe de métricas não contém baseline '{expected_baseline}'"
-    
-    assert (
-        ('arima' in models) or
-        ('sarima' in models)
-    ), "Dataframe de previsões não contém modelo 'arima' ou 'sarima'"
-    
-
-def generate_validation_predictions_file(
-    validation_predictions_generating_function: Callable,
-    *args
-):
-    val_pred_df = validation_predictions_generating_function(*args)
-    
-    assert_val_pred_df(val_pred_df)
-    
-    val_pred_df.to_csv(PREDICTIONS_PATH, index=False)
 
 if __name__ == "__main__":
-    # generate_metrics_file(mock_metrics_generating_function, DataReader('validation').to_long())
-    # generate_validation_predictions_file(mock_predictions_generating_function)
-    
-    # Predictions and metrics with actual baselines
-    
-    def _all_predictions(train: DataReader, datas_validacao: pd.DatetimeIndex):
-        baselines_predictions = prever_baselines(train, datas_validacao)
-        sarima_predictions = ajustar_e_prever_sarima(train, datas_validacao)
-        
-        all_predictions = pd.concat([baselines_predictions, sarima_predictions])
-        
-        return all_predictions
-    
-    generate_validation_predictions_file(_all_predictions, DataReader('train'), DataReader('validation').get_dates())
-    
-    previsoes = pd.concat([
-        pd.read_csv(BASE_PATH / "outputs" / "previsoes_baselines.csv"),
-        pd.read_csv(BASE_PATH / "outputs" / "previsoes_sarima.csv"),
-    ], ignore_index=True)
-    generate_metrics_file(
-        avaliar_previsoes,
-        previsoes,
-        DataReader("validation"),
-        pd.read_csv(BASE_PATH / "outputs" / "naive_sazonal_insample.csv"),
-    )
+    main()

@@ -1,168 +1,133 @@
+# model_linear_direto_hobbies.py
+from pathlib import Path
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from sklearn.linear_model import ElasticNet, Ridge
-from sklearn.metrics import mean_absolute_error
-from sklearn.model_selection import TimeSeriesSplit
-from typing import Tuple, List, Dict
+try:
+    from .tuning import nested_cv, make_ridge
+except ImportError:
+    from tuning import nested_cv, make_ridge
 
-# ==============================================================================
-# CONFIGURAÇÕES GERAIS
-# ==============================================================================
-BASE_PATH = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_PATH / "dados"
-OUTPUT_DIR = BASE_PATH / "outputs"
+DATA_DIR = Path("dados")
 SERIE = "HOBBIES"
 PRECO_COL = "preco_HOBBIES"
 ORIGEM = pd.Timestamp("2016-03-27")
 VAL_START = pd.Timestamp("2016-03-28")
 VAL_END = pd.Timestamp("2016-04-24")
+HORIZONTE = 28
+LAGS = [1, 7, 14, 21, 28]
+TIPOS_EVENTO = ["Sporting", "Cultural", "National", "Religious"]
+GRID_RIDGE = {"alpha": [0.01, 0.1, 1.0, 10.0, 100.0]}
 
-# MUDANÇA 1: Lags mínimos de 28 dias. Nenhum dado com menos de 28 dias é usado.
-LAGS = [28, 35, 42, 49, 56]
 
-def carregar_dados() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Carrega os dados brutos e garante ordenação temporal."""
-    train_df = pd.read_csv(DATA_DIR / "treino.csv", parse_dates=["date"]).sort_values("date")
-    val_df = pd.read_csv(DATA_DIR / "validacao.csv", parse_dates=["date"]).sort_values("date")
-    cov_df = pd.read_csv(DATA_DIR / "covariaveis.csv", parse_dates=["date"]).sort_values("date")
-    return train_df.reset_index(drop=True), val_df.reset_index(drop=True), cov_df.reset_index(drop=True)
+def carregar_dados():
+    train = pd.read_csv(DATA_DIR / "treino.csv", parse_dates=["date"]).sort_values("date").reset_index(drop=True)
+    val = pd.read_csv(DATA_DIR / "validacao.csv", parse_dates=["date"]).sort_values("date").reset_index(drop=True)
+    cov = pd.read_csv(DATA_DIR / "covariaveis.csv", parse_dates=["date"]).sort_values("date").reset_index(drop=True)
+    return train, val, cov
 
-def calcular_estatisticas_treino(train_df: pd.DataFrame, cov_df: pd.DataFrame) -> Dict[str, float]:
-    """Calcula média e desvio padrão EXCLUSIVAMENTE com dados do treino (sem leakage)."""
-    y_mean = train_df[SERIE].mean()
-    y_std = train_df[SERIE].std(ddof=0)
-    
-    cov_train = cov_df[cov_df["date"] <= ORIGEM]
-    preco_mean = cov_train[PRECO_COL].mean()
-    preco_std = cov_train[PRECO_COL].std(ddof=0)
-    
-    return {"y_mean": y_mean, "y_std": y_std, "preco_mean": preco_mean, "preco_std": preco_std}
 
-def preparar_exogenas(cov_df: pd.DataFrame, stats: Dict[str, float]) -> pd.DataFrame:
-    """Gera covariáveis de calendário, eventos e preço padronizado."""
-    df = cov_df[["date", PRECO_COL, "snap_CA", "event_type_1", "event_type_2"]].copy()
-    
+def preparar_covariaveis(cov, stats):
+    df = cov.copy()
+    df["is_event"] = (df["event_type_1"].notna() | df["event_type_2"].notna()).astype(int)
+    for tipo in TIPOS_EVENTO:
+        df[f"ev1_{tipo}"] = (df["event_type_1"] == tipo).astype(int)
+        df[f"ev2_{tipo}"] = (df["event_type_2"] == tipo).astype(int)
+    df["dow"] = df["date"].dt.day_of_week
+    df["day_of_year"] = df["date"].dt.day_of_year
+    df["sin_anual"] = np.sin(2 * np.pi * df["day_of_year"] / 365.25)
+    df["cos_anual"] = np.cos(2 * np.pi * df["day_of_year"] / 365.25)
+    df["snap"] = df["snap_CA"]
     df["preco_std"] = (df[PRECO_COL] - stats["preco_mean"]) / stats["preco_std"]
-    df["is_event"] = (df["event_type_1"].notna() | df["event_type_2"].notna()).astype(float)
-    df["is_national_or_religious"] = (
-        df["event_type_1"].isin(["National", "Religious"]) | 
-        df["event_type_2"].isin(["National", "Religious"])
-    ).astype(float)
-    
-    dow = df["date"].dt.dayofweek
-    for d in range(1, 7):
-        df[f"dow_{d}"] = (dow == d).astype(float)
-        
-    day_of_year = df["date"].dt.dayofyear
-    df["sin_anual"] = np.sin(2 * np.pi * day_of_year / 365.25)
-    df["cos_anual"] = np.cos(2 * np.pi * day_of_year / 365.25)
-    
-    cols_drop = [PRECO_COL, "event_type_1", "event_type_2"]
-    return df.drop(columns=cols_drop)
-
-def construir_base_features(train_df: pd.DataFrame, exog_df: pd.DataFrame, stats: Dict[str, float]) -> pd.DataFrame:
-    """
-    MUDANÇA 2: Aplica lags sobre toda a base. 
-    Como o menor lag é 28, o período de validação herda os números exatos do treino.
-    """
-    # Fazemos o merge com exog_df inteiro (que vai até o fim da validação)
-    df = pd.merge(exog_df, train_df[["date", SERIE]], on="date", how="left").sort_values("date")
-    
-    # y_std ficará como NaN nas datas da validação (o que é perfeito para blindar vazamento)
-    df["y_std"] = (df[SERIE] - stats["y_mean"]) / stats["y_std"]
-    
-    # Criamos lags atrasados em no mínimo 4 semanas
-    for lag in LAGS:
-        df[f"lag_{lag}"] = df["y_std"].shift(lag)
-        
-    # MUDANÇA 3: As médias móveis ganham um shift(28) antes da rolagem.
-    # Ex: A previsão do dia 28/03 vai olhar a média de vendas de 7 dias que terminaram em 29/02.
-    df["rolling_mean_7"] = df["y_std"].shift(28).rolling(7).mean()
-    df["rolling_mean_28"] = df["y_std"].shift(28).rolling(28).mean()
-    
     return df
 
-def treinar_modelo_linear(X_train: np.ndarray, y_train: np.ndarray) -> ElasticNet:
-    """Validação Cruzada Temporal e treino final do modelo simplificado direto."""
-    tscv = TimeSeriesSplit(n_splits=5, test_size=28)
-    melhor_score = float("inf")
-    melhor_cfg = (1.0, 0.0) 
-    
-    for alpha in [0.001, 0.01, 0.05, 0.1, 0.5, 1.0]:
-        for l1_ratio in [0.0, 0.25, 0.5, 0.75, 1.0]:
-            erros_cv = []
-            for tr_idx, te_idx in tscv.split(X_train):
-                mod = Ridge(alpha=alpha) if l1_ratio == 0.0 else ElasticNet(alpha=alpha, l1_ratio=l1_ratio, max_iter=5000, random_state=42)
-                mod.fit(X_train[tr_idx], y_train[tr_idx])
-                erros_cv.append(mean_absolute_error(y_train[te_idx], mod.predict(X_train[te_idx])))
-            
-            media_cv = np.mean(erros_cv)
-            if media_cv < melhor_score:
-                melhor_score = media_cv
-                melhor_cfg = (alpha, l1_ratio)
-                
-    best_alpha, best_l1 = melhor_cfg
-    print(f"[{SERIE}] Melhor hiperparâmetro cv (Direto): alpha={best_alpha}, l1_ratio={best_l1}")
-    
-    modelo_final = Ridge(alpha=best_alpha) if best_l1 == 0.0 else ElasticNet(alpha=best_alpha, l1_ratio=best_l1, max_iter=5000, random_state=42)
-    modelo_final.fit(X_train, y_train)
-    return modelo_final
 
-def calcular_metricas(y_true: np.ndarray, yhat: np.ndarray, y_train_raw: np.ndarray) -> Dict[str, float]:
-    """Cálculo das métricas padronizado pela Task 2."""
+def calcular_stats(train, cov):
+    cov_train = cov[cov["date"] <= ORIGEM]
+    return {"y_mean": float(train[SERIE].mean()), "y_std": float(train[SERIE].std(ddof=0)),
+            "preco_mean": float(cov_train[PRECO_COL].mean()),
+            "preco_std": float(cov_train[PRECO_COL].std(ddof=0))}
+
+
+def _features_origem(row):
+    f = {f"lag_{k}": row[f"lag_{k}"] for k in LAGS}
+    f["roll_7"] = row["roll_7"]; f["roll_28"] = row["roll_28"]; f["y_origem_std"] = row["y_std"]
+    return f
+
+
+def _features_alvo(alvo, h):
+    f = {"h": h, "dow": alvo["dow"], "day_of_year": alvo["day_of_year"],
+         "sin_anual": alvo["sin_anual"], "cos_anual": alvo["cos_anual"],
+         "preco_std": alvo["preco_std"], "snap": alvo["snap"], "is_event": alvo["is_event"]}
+    for tipo in TIPOS_EVENTO:
+        f[f"ev1_{tipo}"] = alvo[f"ev1_{tipo}"]; f[f"ev2_{tipo}"] = alvo[f"ev2_{tipo}"]
+    return f
+
+
+def construir_dataset(train, cov, stats):
+    df = train[["date", SERIE]].merge(cov, on="date", how="left").sort_values("date").reset_index(drop=True)
+    df["y_std"] = (df[SERIE] - stats["y_mean"]) / stats["y_std"]
+    for lag in LAGS: df[f"lag_{lag}"] = df["y_std"].shift(lag)
+    df["roll_7"] = df["y_std"].shift(1).rolling(7).mean()
+    df["roll_28"] = df["y_std"].shift(1).rolling(28).mean()
+    datas = df["date"].values; idx = {d: i for i, d in enumerate(datas)}
+    max_origem = datas[-1] - np.timedelta64(HORIZONTE, "D")
+    regs = []
+    for i, t in enumerate(datas):
+        if t > max_origem: break
+        base = _features_origem(df.iloc[i])
+        for h in range(1, HORIZONTE + 1):
+            j = idx.get(t + np.timedelta64(h, "D"))
+            if j is None: continue
+            alvo = df.iloc[j]
+            if pd.isna(alvo["y_std"]): continue
+            feat = base.copy(); feat.update(_features_alvo(alvo, h)); feat["y"] = alvo["y_std"]
+            regs.append(feat)
+    out = pd.DataFrame(regs)
+    feature_cols = [c for c in out.columns if c != "y"]
+    out = out.dropna(subset=feature_cols + ["y"]).reset_index(drop=True)
+    return out[feature_cols].to_numpy(), out["y"].to_numpy(), feature_cols, df
+
+
+def prever_direto(modelo, feature_cols, df, cov, stats):
+    row = df[df["date"] == ORIGEM].iloc[0]
+    base = _features_origem(row)
+    datas_alvo = pd.date_range(VAL_START, VAL_END, freq="D")
+    cov_alvo = cov.set_index("date").loc[datas_alvo]
+    regs = []
+    for h, data_alvo in enumerate(datas_alvo, start=1):
+        feat = base.copy(); feat.update(_features_alvo(cov_alvo.loc[data_alvo], h)); regs.append(feat)
+    X = pd.DataFrame(regs)[feature_cols]
+    yhat_std = modelo.predict(X)
+    return np.maximum(0.0, yhat_std * stats["y_std"] + stats["y_mean"]), datas_alvo
+
+
+def calcular_metricas(y_true, yhat, y_train):
     err = yhat - y_true
-    mae = float(np.abs(err).mean())
-    rmse = float(np.sqrt((err**2).mean()))
-    mase_scale = float(np.abs(y_train_raw[7:] - y_train_raw[:-7]).mean())
-    mase = mae / mase_scale if mase_scale > 0 else float("nan")
-    return {"mae": mae, "rmse": rmse, "mase": mase}
+    mae = float(np.abs(err).mean()); rmse = float(np.sqrt((err ** 2).mean()))
+    escala = float(np.abs(y_train[7:] - y_train[:-7]).mean())
+    return {"mae": mae, "rmse": rmse, "mase": mae / escala if escala > 0 else float("nan")}
+
 
 def main():
-    print(f"--- Iniciando Pipeline Linear DIRETO: {SERIE} ---")
-    train_df, val_df, cov_df = carregar_dados()
-    
-    stats = calcular_estatisticas_treino(train_df, cov_df)
-    exog_df = preparar_exogenas(cov_df, stats)
-    
-    df_features = construir_base_features(train_df, exog_df, stats)
-    features_cols = [c for c in df_features.columns if c not in ("date", SERIE, "y_std")]
-    
-    # 1. Isola base de Treino (<= 2016-03-27)
-    train_mask = df_features["date"] <= ORIGEM
-    df_train = df_features[train_mask].dropna().reset_index(drop=True)
-    X_train = df_train[features_cols].to_numpy()
-    y_train = df_train["y_std"].to_numpy()
-    
-    modelo = treinar_modelo_linear(X_train, y_train)
-    
-    # 2. Isola base de Validação (2016-03-28 a 2016-04-24)
-    val_mask = (df_features["date"] >= VAL_START) & (df_features["date"] <= VAL_END)
-    df_val = df_features[val_mask].sort_values("date").copy()
-    
-    # MUDANÇA 4: Previsão direta de todos os dias simultaneamente (vetorizada)
-    X_val = df_val[features_cols].to_numpy()
-    yhat_std = modelo.predict(X_val)
-    
-    # Desfaz padronização
-    yhat = np.maximum(0.0, yhat_std * stats["y_std"] + stats["y_mean"])
-    
-    # 3. Avaliação
-    val_dates = pd.date_range(VAL_START, VAL_END, freq="D")
-    y_true = val_df.set_index("date").loc[val_dates, SERIE].to_numpy()
-    
-    metricas = calcular_metricas(y_true, yhat, train_df[SERIE].to_numpy())
-    print(f"Métricas DIRETA {SERIE}: MAE={metricas['mae']:.4f} | RMSE={metricas['rmse']:.4f} | MASE={metricas['mase']:.4f}")
-    
-    pd.DataFrame({
-        "date": val_dates.strftime("%Y-%m-%d"), "series": SERIE, "modelo": "linear", "yhat": yhat
-    }).to_csv(OUTPUT_DIR / f"previsoes_linear_direto_{SERIE}.csv", index=False)
+    print("--- LINEAR DIRETO HOBBIES (com 2NCV) ---")
+    train, val, cov = carregar_dados()
+    stats = calcular_stats(train, cov)
+    cov = preparar_covariaveis(cov, stats)
+    X, y, feature_cols, df_lag = construir_dataset(train, cov, stats)
+    print(f"Dataset: {len(X)} linhas | {len(feature_cols)} features")
 
-    pd.DataFrame([{
-            "series": SERIE, "modelo": "linear", "mae": metricas['mae'], "rmse": metricas['rmse'], "mase": metricas['mase']
-        }]).to_csv(OUTPUT_DIR / f"metricas_linear_direto_{SERIE}.csv", index=False)
-    print("Arquivos parciais (direto) gerados com sucesso!")
-    
+    best_params, _ = nested_cv(X, y, make_ridge, GRID_RIDGE, nome="linear")
+    modelo = make_ridge(**best_params); modelo.fit(X, y)
+    yhat, datas = prever_direto(modelo, feature_cols, df_lag, cov, stats)
+    y_true = val.set_index("date").loc[datas, SERIE].to_numpy()
+    m = calcular_metricas(y_true, yhat, train[SERIE].to_numpy())
+    print(f"  [linear] VALIDAÇÃO: MAE={m['mae']:.4f} RMSE={m['rmse']:.4f} MASE={m['mase']:.4f}")
+
+    pd.DataFrame({"date": datas.strftime("%Y-%m-%d"), "series": SERIE, "modelo": "linear", "yhat": yhat}).to_csv(
+        f"previsoes_linear_direto_{SERIE}.csv", index=False)
+    pd.DataFrame([{"series": SERIE, "modelo": "linear", **m}]).to_csv(
+        f"metricas_linear_direto_{SERIE}.csv", index=False)
+
 
 if __name__ == "__main__":
     main()

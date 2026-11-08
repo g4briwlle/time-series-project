@@ -12,5 +12,6 @@ ORIGEM = pd.Timestamp("2016-03-27")
 VAL_START = pd.Timestamp("2016-03-28")
 VAL_END = pd.Timestamp("2016-04-24")
 LAG = 28
+LAGS_RECURSIVE = [1, 2, 3, 4, 5, 6, 7, 14, 21, 28]
 
 VAL_DATES = pd.date_range(VAL_START, VAL_END, freq="D")

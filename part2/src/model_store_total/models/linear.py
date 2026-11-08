@@ -5,7 +5,7 @@ from ..data.load_data import carregar_dados
 from ..data.prepare_data import (
     compute_train_stats,
     build_exog_features,
-    build_train_base,
+    build_train_base_direct,
     build_validation_base,
     feature_columns
 )
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     exog_feats = build_exog_features(cov_df, stats)
 
     # 3) Bases de treino e validação
-    X_train_df, y_train_std = build_train_base(train_df, exog_feats, stats)
+    X_train_df, y_train_std = build_train_base_direct(train_df, exog_feats, stats)
     X_validation = build_validation_base(exog_feats, y_train_std, stats)
 
     # 4) Sanidade: mesmas colunas, mesma ordem

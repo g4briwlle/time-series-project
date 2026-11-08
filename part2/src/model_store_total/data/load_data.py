@@ -2,7 +2,7 @@ import pandas as pd
 
 from typing import Tuple
 
-from .config_store_total import DATA_DIR
+from ..config import DATA_DIR
 
 def _load(path) -> pd.DataFrame:
     df = pd.read_csv(path, parse_dates=["date"], index_col="date")

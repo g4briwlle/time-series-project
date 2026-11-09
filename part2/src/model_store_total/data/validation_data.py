@@ -5,7 +5,7 @@ from typing import Dict
 from ..config import (
     ORIGEM, LAG, VAL_DATES, LAGS_RECURSIVE
 )
-from .load_data import carregar_dados
+from .load_data import load_data
 from .data_utils import _ensure_datetime_index, add_lag28
 
 
@@ -30,6 +30,7 @@ def build_validation_base_direct(
     exog_feats: pd.DataFrame,
     y_train_std: pd.Series,
     stats: Dict[str, float],
+    val_dates = VAL_DATES
 ) -> pd.DataFrame:
     """Monta X_validation: features exógenas no horizonte + lag-28 do treino,
     padronizadas com as estatísticas do treino (`stats`).
@@ -44,10 +45,10 @@ def build_validation_base_direct(
     """
     exog_feats = _ensure_datetime_index(exog_feats)
 
-    X_val = exog_feats.reindex(VAL_DATES).copy()
+    X_val = exog_feats.reindex(val_dates).copy()
     X_val = add_lag28(X_val, y_train_std)
 
-    assert (VAL_DATES - pd.Timedelta(days=LAG) <= ORIGEM).all(), \
+    assert (val_dates - pd.Timedelta(days=LAG) <= ORIGEM).all(), \
         "Vazamento: lag-28 da validação puxa dado futuro"
 
     return standardize_validation(X_val, stats)
@@ -56,10 +57,10 @@ def build_validation_base_direct(
 def build_validation_base_recursive(
     exog_feats: pd.DataFrame,
     stats: Dict[str, float],
+    val_dates = VAL_DATES
 ) -> pd.DataFrame:
     exog_feats = _ensure_datetime_index(exog_feats)
     
-    X_val = exog_feats.reindex(VAL_DATES).copy()
+    X_val = exog_feats.reindex(val_dates).copy()
     
     return standardize_validation(X_val, stats)
-    

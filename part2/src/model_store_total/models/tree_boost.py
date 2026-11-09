@@ -1,7 +1,11 @@
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-from .models_utils import tree_and_boosting_pipeline, tree_and_boosting_recursive_pipeline
+import pandas as pd
+import numpy as np
+
+from .models_utils import tree_and_boosting_predict_and_report, tree_and_boosting_recursive_pipeline
+
 
 # --- Model setup ------------------------------------------------------
 TREE_PARAMS = {
@@ -27,7 +31,7 @@ boosting_model_direct = HistGradientBoostingRegressor(**BOOST_PARAMS_DIRECT)
 boosting_model_recursive = HistGradientBoostingRegressor(**BOOST_PARAMS_RECURSIVE)
 
 if __name__ == "__main__":
-    tree_and_boosting_pipeline(tree_model_direct, 'arvore_direto')
-    tree_and_boosting_pipeline(boosting_model_direct, 'boosting_direto')
+    tree_and_boosting_predict_and_report(tree_model_direct, 'arvore_direto')
+    tree_and_boosting_predict_and_report(boosting_model_direct, 'boosting_direto')
     tree_and_boosting_recursive_pipeline(tree_model_recursive, 'arvore_recursivo')
     tree_and_boosting_recursive_pipeline(boosting_model_recursive, 'boosting_recursivo')

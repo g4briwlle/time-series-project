@@ -6,7 +6,7 @@ from typing import Tuple
 from ..config import (
     SERIE, VAL_END, VAL_START
 )
-from .load_data import carregar_dados
+from .load_data import load_data
 from .train_data import *
 from .validation_data import *
 from .data_utils import *
@@ -81,7 +81,7 @@ def get_all_data() -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, np.ndarray]:
         pd.DataFrame: X_validation_horizon
         np.ndarray: y_true
     """
-    train_df, val_df, cov_df = carregar_dados()
+    train_df, val_df, cov_df = load_data()
             
     # 1) Estatísticas do treino (antes de construir features)
     stats = compute_train_stats(train_df, cov_df)
@@ -111,7 +111,7 @@ def get_all_data_recursive() -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, np.
     """
     Returns data formatted for a 1-step ahead recursive forecasting strategy.
     """
-    train_df, val_df, cov_df = carregar_dados()
+    train_df, val_df, cov_df = load_data()
             
     stats = compute_train_stats(train_df, cov_df)
     exog_feats = build_exog_features(cov_df, stats)
@@ -129,7 +129,7 @@ def get_all_data_recursive() -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, np.
     return X_train_df, y_train_std, X_validation, y_true, stats
 
 if __name__ == "__main__":
-    train_df, val_df, cov_df = carregar_dados()
+    train_df, val_df, cov_df = load_data()
         
     # 1) Estatísticas do treino (antes de construir features)
     stats = compute_train_stats(train_df, cov_df)

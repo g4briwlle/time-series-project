@@ -11,7 +11,7 @@ def _load(path) -> pd.DataFrame:
     df = df.set_index(pd.to_datetime(df["date"]))
     return df
 
-def carregar_dados() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Carrega os dados brutos e garante ordenação temporal."""
     return (
         _load(DATA_DIR / "treino.csv"),

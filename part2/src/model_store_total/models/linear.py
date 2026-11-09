@@ -1,7 +1,7 @@
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 
-from ..data.load_data import carregar_dados
+from ..data.load_data import load_data
 from ..data.prepare_data import (
     compute_train_stats,
     build_exog_features,
@@ -19,7 +19,7 @@ from .models_utils import save_outputs
 
 
 if __name__ == "__main__":
-    train_df, val_df, cov_df = carregar_dados()
+    train_df, val_df, cov_df = load_data()
     
     # 1) Estatísticas do treino (antes de construir features)
     stats = compute_train_stats(train_df, cov_df)

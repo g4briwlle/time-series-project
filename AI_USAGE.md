@@ -64,7 +64,7 @@ A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA ajudou a org
 
 # Task 3: árvore e boosting (entrega de 08/11)
 
-Esta seção cobre só a integração da entrega (`run.py`, `README.md` e o check). Os itens de cada modelo de árvore ou boosting (HOBBIES, store_total e FOODS) são acrescentados por quem o escreveu.
+Esta seção cobre a integração da entrega (`run.py`, `README.md` e o check) e o script de árvore e boosting de FOODS. Os itens de cada modelo de árvore ou boosting (HOBBIES, store_total e FOODS) são acrescentados por quem o escreveu.
 
 ## Ferramentas utilizadas
 
@@ -75,6 +75,7 @@ Esta seção cobre só a integração da entrega (`run.py`, `README.md` e o chec
 - **Leitura das branches:** levantamento do que cada branch da Task 3 entrega por série (HOBBIES com `arvore` e `boosting`, FOODS só com a rede, store_total sem saídas ainda). Esse levantamento serviu de base para a equipe definir o escopo.
 - **Rascunho do `run.py`:** proposta de leitura dos CSVs com mais de um nome de modelo por arquivo, conferência do nome e aviso das séries sem `linear` ou sem `boosting`/`arvore`.
 - **README:** rascunho da tabela de arquivos e scripts.
+- **Modelo de FOODS:** rascunho do script de árvore e boosting de FOODS (`part3/src/foods_model/model_direto_foods.py`), adaptado do modelo direto de HOBBIES, com hiperparâmetros fixos a priori, sem busca e sem olhar a validação. O resultado foi conferido contra o `check_task2.py` antes de entrar.
 - **Check:** execução do `check_task2.py --ate arvore` para listar o que ainda falta.
 
 ## O que a equipe decidiu

@@ -60,9 +60,9 @@ Cada série tem o próprio ajuste. O CSV de previsões de cada modelo tem as col
 | `arvore`, `boosting` | HOBBIES | `part3/outputs/previsoes_direto_HOBBIES.csv` | `part3/src/hobbies_model/model_direto_hobbies.py` |
 | `arvore` | store_total | `part3/outputs/previsoes_arvore_store_total.csv` | `part2/src/model_store_total/models/tree_boost_grid_search.py` |
 | `boosting` | store_total | `part3/outputs/previsoes_boosting_store_total.csv` | `part2/src/model_store_total/models/tree_boost_grid_search.py` |
-| `arvore` ou `boosting` | FOODS | `part3/outputs/previsoes_direto_FOODS.csv` | a definir |
+| `arvore`, `boosting` | FOODS | `part3/outputs/previsoes_direto_FOODS.csv` | `part3/src/foods_model/model_direto_foods.py` |
 
-No HOBBIES entra a estratégia direta, tanto no linear quanto em árvore e boosting. No store_total a estratégia sai da validação cruzada temporal dentro do treino (árvore: recursiva; boosting: direta; ver `part3/outputs/cv_store_total.csv`). Os arquivos `recursivo_` foram o teste da outra estratégia e não entram em `metricas.csv`. A linha de FOODS da Task 3 ainda não está no repositório; até chegar, o `run.py` avisa e o check de 08/11 não fecha em FOODS.
+No HOBBIES entra a estratégia direta, tanto no linear quanto em árvore e boosting. No store_total a estratégia sai da validação cruzada temporal dentro do treino (árvore: recursiva; boosting: direta; ver `part3/outputs/cv_store_total.csv`). Os arquivos `recursivo_` foram o teste da outra estratégia e não entram em `metricas.csv`. Em FOODS, árvore e boosting usam a mesma estrutura do HOBBIES com hiperparâmetros fixos a priori, sem busca.
 
 ### Conferência com o check
 

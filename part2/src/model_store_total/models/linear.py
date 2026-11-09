@@ -1,11 +1,11 @@
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 
-from ..data.load_data import carregar_dados
+from ..data.load_data import load_data
 from ..data.prepare_data import (
     compute_train_stats,
     build_exog_features,
-    build_train_base,
+    build_train_base_direct,
     build_validation_base,
     feature_columns
 )
@@ -19,7 +19,7 @@ from .models_utils import save_outputs
 
 
 if __name__ == "__main__":
-    train_df, val_df, cov_df = carregar_dados()
+    train_df, val_df, cov_df = load_data()
     
     # 1) Estatísticas do treino (antes de construir features)
     stats = compute_train_stats(train_df, cov_df)
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     exog_feats = build_exog_features(cov_df, stats)
 
     # 3) Bases de treino e validação
-    X_train_df, y_train_std = build_train_base(train_df, exog_feats, stats)
+    X_train_df, y_train_std = build_train_base_direct(train_df, exog_feats, stats)
     X_validation = build_validation_base(exog_feats, y_train_std, stats)
 
     # 4) Sanidade: mesmas colunas, mesma ordem

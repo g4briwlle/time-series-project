@@ -93,7 +93,7 @@ Esta seção cobre só a integração da entrega (`run.py`, `README.md` e o chec
 ## Erros corrigidos
 
 - **Refit no `run.py`:** a leitura da nova estrutura mostrou que o `run.py` ainda chamava `part2.src.model_store_total.model_store_total`, módulo que virou `models/linear.py`. Os scripts de HOBBIES também voltaram a ler `dados/` e a gravar os CSVs no diretório de execução, onde o `run.py` não os procura. O `run.py` passou a só consolidar os CSVs versionados, e o README diz isso e lista o script de cada arquivo.
-- **Rótulo no store_total (apontado ao autor, ainda aberto):** `save_outputs` grava `modelo="linear"` também nas saídas de árvore e boosting. O `run.py` recusa o arquivo se o nome do modelo não for `arvore` ou `boosting`, para não duplicar as linhas do linear.
+- **Rótulo e saídas no store_total:** o `save_outputs` gravava `modelo="linear"` também nas saídas de árvore e boosting, e o `main` da busca em grade tinha o grid da árvore comentado, comparava a estratégia com `'direct'` em vez de `'direto'` e sobrescrevia o eixo `estrategia` com uma string, o que multiplicava a grade. Foram corrigidos na branch do autor, a busca foi refeita e os CSVs saíram com `arvore` e `boosting` em `part3/outputs`. O `run.py` recusa um arquivo se o nome do modelo não for `arvore` ou `boosting`.
 
 ## Responsabilidade
 

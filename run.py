@@ -52,8 +52,8 @@ MODEL_PREDICTIONS = [
     ("linear", "store_total", PART2 / "outputs" / "previsoes_linear_store_total.csv", {"linear"}),
     ("arvore", "FOODS", PART3 / "outputs" / "previsoes_direto_FOODS.csv", ARVORE),
     ("arvore", "HOBBIES", PART3 / "outputs" / "previsoes_direto_HOBBIES.csv", ARVORE),
-    ("arvore", "store_total", PART2 / "outputs" / "previsoes_arvore_direto_store_total.csv", {"arvore"}),
-    ("arvore", "store_total", PART2 / "outputs" / "previsoes_boosting_direto_store_total.csv", {"boosting"}),
+    ("arvore", "store_total", PART3 / "outputs" / "previsoes_arvore_store_total.csv", {"arvore"}),
+    ("arvore", "store_total", PART3 / "outputs" / "previsoes_boosting_store_total.csv", {"boosting"}),
 ]
 
 

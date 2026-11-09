@@ -58,11 +58,11 @@ Cada série tem o próprio ajuste. O CSV de previsões de cada modelo tem as col
 | `linear` | HOBBIES | `part2/outputs/previsoes_linear_direto_HOBBIES.csv` | `part2/src/model_direto_hobbies.py` |
 | `linear` | store_total | `part2/outputs/previsoes_linear_store_total.csv` | `part2/src/model_store_total/models/linear.py` |
 | `arvore`, `boosting` | HOBBIES | `part3/outputs/previsoes_direto_HOBBIES.csv` | `part3/src/hobbies_model/model_direto_hobbies.py` |
-| `arvore` | store_total | `part2/outputs/previsoes_arvore_direto_store_total.csv` | `part2/src/model_store_total/models/tree_boost.py` |
-| `boosting` | store_total | `part2/outputs/previsoes_boosting_direto_store_total.csv` | `part2/src/model_store_total/models/tree_boost.py` |
+| `arvore` | store_total | `part3/outputs/previsoes_arvore_store_total.csv` | `part2/src/model_store_total/models/tree_boost_grid_search.py` |
+| `boosting` | store_total | `part3/outputs/previsoes_boosting_store_total.csv` | `part2/src/model_store_total/models/tree_boost_grid_search.py` |
 | `arvore` ou `boosting` | FOODS | `part3/outputs/previsoes_direto_FOODS.csv` | a definir |
 
-No HOBBIES entra a estratégia direta, tanto no linear quanto em árvore e boosting. Os arquivos `recursivo_` foram o teste da outra estratégia e não entram em `metricas.csv`. A linha de FOODS e os dois arquivos de store_total da Task 3 ainda não estão no repositório; até chegarem, o `run.py` avisa e o check de 08/11 não fecha nessas séries.
+No HOBBIES entra a estratégia direta, tanto no linear quanto em árvore e boosting. No store_total a estratégia sai da validação cruzada temporal dentro do treino (árvore: recursiva; boosting: direta; ver `part3/outputs/cv_store_total.csv`). Os arquivos `recursivo_` foram o teste da outra estratégia e não entram em `metricas.csv`. A linha de FOODS da Task 3 ainda não está no repositório; até chegar, o `run.py` avisa e o check de 08/11 não fecha em FOODS.
 
 ### Conferência com o check
 

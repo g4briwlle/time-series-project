@@ -73,3 +73,10 @@ escolher a melhor configuração global (uma única, cruzando estratégias)
 re-treinar vencedor no treino completo
 prever validação oficial
 ```
+
+**Modelos finais após cross-validation**
+
+| Classe | Estratégia selecionada | MASE médio (Cross Validation) | Hiperparâmetros selecionados |
+|---|---:|---:|---|
+| `arvore` | **recursivo** (`r`) | **0.7089659141707365** | `max_depth=4`, `min_samples_leaf=10`, `ccp_alpha=0.0` |
+| `boosting` | **direto** (`d`) | **0.6359961173161627** | `max_iter=200`, `learning_rate=0.1`, `max_depth=3`, `min_samples_leaf=20`, `l2_regularization=0.0` |

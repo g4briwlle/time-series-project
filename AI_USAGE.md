@@ -59,3 +59,32 @@ A IA ajudou a escrever código, mas o papel humano foi essencial: definimos o es
 ## Responsabilidade
 
 A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA ajudou a organizar os materiais e a escrever a parte mecânica do código, e só levamos código para o repositório depois de lê-lo, rodá-lo e conferir os resultados contra o `check_task2.py`.
+
+---
+
+# Task 3: árvore e boosting (entrega de 08/11)
+
+Esta seção cobre a integração da entrega (`run.py`, `README.md` e o check). Os itens de cada modelo de árvore ou boosting (HOBBIES, store_total e FOODS) são acrescentados por quem o escreveu.
+
+## Ferramentas utilizadas
+
+- Claude Code (Anthropic): leitura das branches da Task 3, ajuste do `run.py` para consolidar `arvore` e `boosting` e atualização do `README.md`.
+
+## Onde ajudou
+
+- **Integração:** mapeou o que cada branch da Task 3 entrega por série (HOBBIES com `arvore` e `boosting`, FOODS só com a rede, store_total sem saídas ainda), generalizou a leitura dos CSVs no `run.py` (vários nomes de modelo por arquivo, com conferência do nome) e passou a avisar, no fim da execução, quais séries ficaram sem `linear` ou sem `boosting`/`arvore`.
+- **Conferência:** rodou o `check_task2.py --ate arvore` sobre os arquivos gerados e listou o que ainda falta.
+
+## Exemplos de prompts
+
+- **Escopo:** "This is for the time series work. Found the folder it is in." com a conversa do grupo anexada.
+- **Entrega:** "You should merge ximana/daniel prs and open a pr consolidating."
+
+## Erros corrigidos
+
+- **Refit no `run.py`:** a leitura da nova estrutura mostrou que o `run.py` ainda chamava `part2.src.model_store_total.model_store_total`, módulo que virou `models/linear.py`, e que os scripts de HOBBIES voltaram a ler `dados/` e a gravar os CSVs no diretório de execução, onde o `run.py` não os procura. O `run.py` passou a só consolidar os CSVs versionados, e o README diz isso e lista o script de cada arquivo.
+- **Rótulo no store_total (apontado ao autor, ainda aberto):** `save_outputs` grava `modelo="linear"` também nas saídas de árvore e boosting. O `run.py` recusa o arquivo se o nome do modelo não for `arvore` ou `boosting`, para não duplicar as linhas do linear.
+
+## Responsabilidade
+
+A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA ajudou na parte mecânica da integração, e só levamos código para o repositório depois de lê-lo, rodá-lo e conferir os resultados contra o `check_task2.py`.

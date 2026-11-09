@@ -64,16 +64,26 @@ A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA ajudou a org
 
 # Task 3: árvore e boosting (entrega de 08/11)
 
-Esta seção cobre a integração da entrega (`run.py`, `README.md` e o check). Os itens de cada modelo de árvore ou boosting (HOBBIES, store_total e FOODS) são acrescentados por quem o escreveu.
+Esta seção cobre só a integração da entrega (`run.py`, `README.md` e o check). Os itens de cada modelo de árvore ou boosting (HOBBIES, store_total e FOODS) são acrescentados por quem o escreveu.
 
 ## Ferramentas utilizadas
 
-- Claude Code (Anthropic): leitura das branches da Task 3, ajuste do `run.py` para consolidar `arvore` e `boosting` e atualização do `README.md`.
+- Claude Code (Anthropic), como apoio na integração: leitura das branches e rascunho de trechos do `run.py` e do README, que a equipe revisou.
 
 ## Onde ajudou
 
-- **Integração:** mapeou o que cada branch da Task 3 entrega por série (HOBBIES com `arvore` e `boosting`, FOODS só com a rede, store_total sem saídas ainda), generalizou a leitura dos CSVs no `run.py` (vários nomes de modelo por arquivo, com conferência do nome) e passou a avisar, no fim da execução, quais séries ficaram sem `linear` ou sem `boosting`/`arvore`.
-- **Conferência:** rodou o `check_task2.py --ate arvore` sobre os arquivos gerados e listou o que ainda falta.
+- **Leitura das branches:** levantamento do que cada branch da Task 3 entrega por série (HOBBIES com `arvore` e `boosting`, FOODS só com a rede, store_total sem saídas ainda). Esse levantamento serviu de base para a equipe definir o escopo.
+- **Rascunho do `run.py`:** proposta de leitura dos CSVs com mais de um nome de modelo por arquivo, conferência do nome e aviso das séries sem `linear` ou sem `boosting`/`arvore`.
+- **README:** rascunho da tabela de arquivos e scripts.
+- **Check:** execução do `check_task2.py --ate arvore` para listar o que ainda falta.
+
+## O que a equipe decidiu
+
+- O escopo: integrar só o que já existe, sem ajustar os modelos que faltam em FOODS e store_total.
+- O repositório oficial da entrega (`g4briwlle/time-series-project`) e a base da branch.
+- A estratégia direta nas séries em que há duas (HOBBIES), seguindo a Task 2.
+- A ordem: PRs dos colegas primeiro, consolidação depois.
+- O que entra no README e nesta seção, depois de revisar o PR.
 
 ## Exemplos de prompts
 
@@ -82,9 +92,9 @@ Esta seção cobre a integração da entrega (`run.py`, `README.md` e o check). 
 
 ## Erros corrigidos
 
-- **Refit no `run.py`:** a leitura da nova estrutura mostrou que o `run.py` ainda chamava `part2.src.model_store_total.model_store_total`, módulo que virou `models/linear.py`, e que os scripts de HOBBIES voltaram a ler `dados/` e a gravar os CSVs no diretório de execução, onde o `run.py` não os procura. O `run.py` passou a só consolidar os CSVs versionados, e o README diz isso e lista o script de cada arquivo.
+- **Refit no `run.py`:** a leitura da nova estrutura mostrou que o `run.py` ainda chamava `part2.src.model_store_total.model_store_total`, módulo que virou `models/linear.py`. Os scripts de HOBBIES também voltaram a ler `dados/` e a gravar os CSVs no diretório de execução, onde o `run.py` não os procura. O `run.py` passou a só consolidar os CSVs versionados, e o README diz isso e lista o script de cada arquivo.
 - **Rótulo no store_total (apontado ao autor, ainda aberto):** `save_outputs` grava `modelo="linear"` também nas saídas de árvore e boosting. O `run.py` recusa o arquivo se o nome do modelo não for `arvore` ou `boosting`, para não duplicar as linhas do linear.
 
 ## Responsabilidade
 
-A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA ajudou na parte mecânica da integração, e só levamos código para o repositório depois de lê-lo, rodá-lo e conferir os resultados contra o `check_task2.py`.
+A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA foi usada como apoio; o escopo e as decisões foram da equipe, e só levamos código para o repositório depois de lê-lo, rodá-lo e conferir os resultados contra o `check_task2.py`.

@@ -16,7 +16,7 @@ from ..data.prepare_data import (
     expand_train_horizons,
     add_horizon_to_validation,
 )
-from ..config import SERIE
+from ..config import SERIE, OUTPUT_DIR_TREE
 from .models_utils import (
     tree_and_boosting_pipeline_direct_2,
     tree_and_boosting_recursive_pipeline_2,
@@ -321,7 +321,7 @@ def grid_search_recursive(
     Run the whole grid for the direct strategy on precomputed folds.
     Returns configs sorted by ascending mean MASE (best first).
     """
-    grid['estrategia'] ='recursivo'
+    grid = {**grid, 'estrategia': ['recursivo']}
     
     configs = list(expand_grid(grid))
     results = Parallel(n_jobs=n_jobs, verbose=10)(
@@ -342,7 +342,7 @@ def grid_search_direct(
     Run the whole grid for the direct strategy on precomputed folds.
     Returns configs sorted by ascending mean MASE (best first).
     """
-    grid['estrategia'] ='direto'
+    grid = {**grid, 'estrategia': ['direto']}
     
     configs = list(expand_grid(grid))
     results = Parallel(n_jobs=n_jobs, verbose=10)(
@@ -356,60 +356,39 @@ def grid_search_direct(
 # --- 7. Main ---------------------------------------------------------------
 if __name__ == "__main__":
     train_df, val_df, cov_df = load_data()
-    VALID_DATES = pd.date_range("2016-03-28", "2016-04-24")
     ORIGIN = pd.Timestamp("2016-03-27")
     FOLDS = make_folds(ORIGIN, n_folds=3, horizon=28)
 
-    final_cv_dict = {
-        'arvore': {},
-        'boosting': {}
-    }
+    final_cv = {}
+    for class_name, grid in [("arvore", ARVORE_GRID), ("boosting", BOOSTING_GRID)]:
+        for estrategia, prepare, search in [
+            ("direto", prepare_folds_direct, grid_search_direct),
+            ("recursivo", prepare_folds_recursive, grid_search_recursive),
+        ]:
+            prepared = prepare(train_df, cov_df, SERIE, FOLDS)
+            ranked = search(class_name, grid, prepared)
+            best_mase, best_cfg = ranked[0]
+            print(f"[{SERIE} | {class_name} | {estrategia}] "
+                  f"CV-MASE={best_mase:.4f} | {best_cfg}")
+            if class_name not in final_cv or best_mase < final_cv[class_name]["cv_mase"]:
+                final_cv[class_name] = {
+                    "cv_mase": best_mase,
+                    "estrategia": estrategia,
+                    "config": dict(best_cfg),
+                }
 
-    for class_name, grid in [
-        ("boosting", BOOSTING_GRID),
-        # ("arvore",   ARVORE_GRID),
-    ]:
-        prepared = prepare_folds_direct(train_df, cov_df, SERIE, FOLDS)
-        ranked = grid_search_direct(class_name, grid, prepared)
-        best_mase, best_cfg = ranked[0]
-        print(f"[{SERIE} | {class_name} | direto] "
-                f"CV-MASE={best_mase:.4f} | {best_cfg}")
-        
-        final_cv_dict[class_name]['best_mase'] = best_mase
-        final_cv_dict[class_name]['best_cfg'] = best_cfg
-        final_cv_dict[class_name]['direto_recursivo'] = 'direto'
-        
-        prepared = prepare_folds_recursive(train_df, cov_df, SERIE, FOLDS)
-        ranked = grid_search_recursive(class_name, grid, prepared)
-        best_mase, best_cfg = ranked[0]
-        print(f"[{SERIE} | {class_name} | direto] "
-                f"CV-MASE={best_mase:.4f} | {best_cfg}")
-        
-        if best_mase < final_cv_dict[class_name]['best_mase']:
-            final_cv_dict[class_name]['best_mase'] = best_mase
-            final_cv_dict[class_name]['best_cfg'] = best_cfg
-            final_cv_dict[class_name]['direto_recursivo'] = 'recursivo'
-    
     print("DICIONÁRIO DE PARÂMETROS FINAL")
-    print(final_cv_dict)
-    
-    # Running pipeline for final models
-    direct_recursive_arvore = final_cv_dict['arvore']['direto_recursivo']
-    final_arvore_params = final_cv_dict['arvore']['best_cfg']
-    del final_arvore_params['estrategia']
-    final_arvore = DecisionTreeRegressor(**final_arvore_params) # type: ignore
-    
-    if direct_recursive_arvore == 'direct':
-        tree_and_boosting_predict_and_report(final_arvore, 'arvore')
-    else:
-        tree_and_boosting_recursive_pipeline(final_arvore, 'arvore')
-    
-    direct_recursive_boosting = final_cv_dict['boosting']['direto_recursivo']
-    final_boosting_params = final_cv_dict['boosting']['best_cfg']
-    del final_boosting_params['estrategia']
-    final_boosting = HistGradientBoostingRegressor(**final_boosting_params) # type: ignore
-    
-    if direct_recursive_boosting == 'direct':
-        tree_and_boosting_predict_and_report(final_boosting, 'boosting')
-    else:
-        tree_and_boosting_recursive_pipeline(final_boosting, 'boosting')
+    print(final_cv)
+
+    estimadores = {"arvore": DecisionTreeRegressor, "boosting": HistGradientBoostingRegressor}
+    linhas = []
+    for class_name, res in final_cv.items():
+        params = {k: v for k, v in res["config"].items() if k != "estrategia"}
+        final_model = build_estimator(class_name, params)
+        if res["estrategia"] == "direto":
+            tree_and_boosting_predict_and_report(final_model, class_name, output_dir=OUTPUT_DIR_TREE)
+        else:
+            tree_and_boosting_recursive_pipeline(final_model, class_name, output_dir=OUTPUT_DIR_TREE)
+        linhas.append({"series": SERIE, "modelo": class_name, "estrategia": res["estrategia"],
+                       "cv_mase": res["cv_mase"], **params})
+    pd.DataFrame(linhas).to_csv(OUTPUT_DIR_TREE / "cv_store_total.csv", index=False)

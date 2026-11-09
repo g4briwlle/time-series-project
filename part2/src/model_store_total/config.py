@@ -6,6 +6,7 @@ from pathlib import Path
 BASE_PATH = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_PATH / 'dados'
 OUTPUT_DIR = BASE_PATH / 'outputs'
+OUTPUT_DIR_TREE = BASE_PATH.parent / 'part3' / 'outputs'
 SERIE = "store_total"
 PRECO_COL = f"preco_{SERIE}"
 ORIGEM = pd.Timestamp("2016-03-27")

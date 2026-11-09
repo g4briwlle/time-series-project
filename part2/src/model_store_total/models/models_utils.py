@@ -38,10 +38,11 @@ def save_outputs(
     y_hat: pd.Series,
     val_dates: pd.DatetimeIndex,
     metrics: Dict[str, float],
-    model_name: str
+    model_name: str,
+    output_dir=OUTPUT_DIR,
 ):
-    predictions_path = OUTPUT_DIR / f'previsoes_{model_name}_store_total.csv'
-    metrics_path = OUTPUT_DIR / f'metricas_{model_name}_store_total.csv'
+    predictions_path = output_dir / f'previsoes_{model_name}_store_total.csv'
+    metrics_path = output_dir / f'metricas_{model_name}_store_total.csv'
     
     pd.DataFrame({
         "date": val_dates.strftime("%Y-%m-%d"), "series": SERIE, "modelo": model_name, "yhat": y_hat
@@ -123,7 +124,7 @@ def tree_and_boosting_pipeline_direct_2(
     y_hat = predict_model(X_val_h, stats, model, cols)
     return y_hat
 
-def tree_and_boosting_predict_and_report(model, model_name):
+def tree_and_boosting_predict_and_report(model, model_name, output_dir=OUTPUT_DIR):
     """
     Common model fit, predict and report pipeline for using in different models.
     """
@@ -146,7 +147,7 @@ def tree_and_boosting_predict_and_report(model, model_name):
 
     # 8) Salvar resultados (assumindo que save_outputs recebe o nome do modelo 
     # ou que você adapta para salvar em tabelas diferentes)
-    save_outputs(y_hat, VAL_DATES, validation_metrics, model_name=model_name)
+    save_outputs(y_hat, VAL_DATES, validation_metrics, model_name=model_name, output_dir=output_dir)
     print(validation_metrics)
 
 def tree_and_boosting_recursive_pipeline_2(
@@ -202,7 +203,7 @@ def tree_and_boosting_recursive_pipeline_2(
     
     return y_hat_final
 
-def tree_and_boosting_recursive_pipeline(model, model_name):
+def tree_and_boosting_recursive_pipeline(model, model_name, output_dir=OUTPUT_DIR):
     """
     Trains the model on 1-step ahead data and predicts recursively over the validation horizon.
     """
@@ -263,5 +264,5 @@ def tree_and_boosting_recursive_pipeline(model, model_name):
         y_train_naive
     )
 
-    save_outputs(y_hat_final, VAL_DATES, validation_metrics, model_name=model_name)
+    save_outputs(y_hat_final, VAL_DATES, validation_metrics, model_name=model_name, output_dir=output_dir)
     print(validation_metrics)

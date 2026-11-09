@@ -59,3 +59,43 @@ A IA ajudou a escrever código, mas o papel humano foi essencial: definimos o es
 ## Responsabilidade
 
 A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA ajudou a organizar os materiais e a escrever a parte mecânica do código, e só levamos código para o repositório depois de lê-lo, rodá-lo e conferir os resultados contra o `check_task2.py`.
+
+---
+
+# Task 3: árvore e boosting (entrega de 08/11)
+
+Esta seção cobre a integração da entrega (`run.py`, `README.md` e o check) e o script de árvore e boosting de FOODS. Os itens de cada modelo de árvore ou boosting (HOBBIES, store_total e FOODS) são acrescentados por quem o escreveu.
+
+## Ferramentas utilizadas
+
+- Claude Code (Anthropic), como apoio na integração: leitura das branches e rascunho de trechos do `run.py` e do README, que a equipe revisou.
+
+## Onde ajudou
+
+- **Leitura das branches:** levantamento do que cada branch da Task 3 entrega por série (HOBBIES com `arvore` e `boosting`, FOODS só com a rede, store_total sem saídas ainda). Esse levantamento serviu de base para a equipe definir o escopo.
+- **Rascunho do `run.py`:** proposta de leitura dos CSVs com mais de um nome de modelo por arquivo, conferência do nome e aviso das séries sem `linear` ou sem `boosting`/`arvore`.
+- **README:** rascunho da tabela de arquivos e scripts.
+- **Modelo de FOODS:** rascunho do script de árvore e boosting de FOODS (`part3/src/foods_model/model_direto_foods.py`), adaptado do modelo direto de HOBBIES, com hiperparâmetros fixos a priori, sem busca e sem olhar a validação. O resultado foi conferido contra o `check_task2.py` antes de entrar.
+- **Check:** execução do `check_task2.py --ate arvore` para listar o que ainda falta.
+
+## O que a equipe decidiu
+
+- O escopo: integrar só o que já existe, sem ajustar os modelos que faltam em FOODS e store_total.
+- O repositório oficial da entrega (`g4briwlle/time-series-project`) e a base da branch.
+- A estratégia direta nas séries em que há duas (HOBBIES), seguindo a Task 2.
+- A ordem: PRs dos colegas primeiro, consolidação depois.
+- O que entra no README e nesta seção, depois de revisar o PR.
+
+## Exemplos de prompts
+
+- **Escopo:** "This is for the time series work. Found the folder it is in." com a conversa do grupo anexada.
+- **Entrega:** "You should merge ximana/daniel prs and open a pr consolidating."
+
+## Erros corrigidos
+
+- **Refit no `run.py`:** a leitura da nova estrutura mostrou que o `run.py` ainda chamava `part2.src.model_store_total.model_store_total`, módulo que virou `models/linear.py`. Os scripts de HOBBIES também voltaram a ler `dados/` e a gravar os CSVs no diretório de execução, onde o `run.py` não os procura. O `run.py` passou a só consolidar os CSVs versionados, e o README diz isso e lista o script de cada arquivo.
+- **Rótulo e saídas no store_total:** o `save_outputs` gravava `modelo="linear"` também nas saídas de árvore e boosting, e o `main` da busca em grade tinha o grid da árvore comentado, comparava a estratégia com `'direct'` em vez de `'direto'` e sobrescrevia o eixo `estrategia` com uma string, o que multiplicava a grade. Foram corrigidos na branch do autor, a busca foi refeita e os CSVs saíram com `arvore` e `boosting` em `part3/outputs`. O `run.py` recusa um arquivo se o nome do modelo não for `arvore` ou `boosting`.
+
+## Responsabilidade
+
+A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA foi usada como apoio; o escopo e as decisões foram da equipe, e só levamos código para o repositório depois de lê-lo, rodá-lo e conferir os resultados contra o `check_task2.py`.

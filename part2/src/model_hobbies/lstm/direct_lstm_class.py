@@ -72,80 +72,97 @@ class DirectLSTMForecaster(BaseEstimator):
         h_cos = np.full((n, 1), np.cos(2 * np.pi * h_val / 7.0), dtype=np.float32)
         return np.hstack([X_feat, h_norm, h_sin, h_cos])
 
-    def fit(self, X: pd.DataFrame, y: pd.Series | np.ndarray):
+    # direct_lstm_class.py — additions to the class
+
+    def _prepare_windows(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series | np.ndarray,
+        seq_len: int,
+        mode: str,
+    ) -> dict[int, tuple[np.ndarray, np.ndarray, np.ndarray | None]]:
+        """
+        Build per-horizon 3-D windows once, so fit() can skip make_sliding_windows.
+        Returns {h: (X_3d, y_3d, last_context)} where last_context is the last
+        (seq_len - 1) encoded rows of that horizon (or None if seq_len <= 1).
+        """
+        h_vals = X[self.h_col].astype(int).to_numpy()
+        feature_names = [c for c in X.columns if c != self.h_col]
+        X_raw = X[feature_names].to_numpy(dtype=np.float32)
+        y_arr = np.asarray(y, dtype=np.float32).ravel()
+
+        out: dict[int, tuple] = {}
+        for h in sorted(np.unique(h_vals)):
+            mask = h_vals == h
+            Xh = self._encode_h(X_raw[mask], h) if mode == "pooled" else X_raw[mask]
+            yh = y_arr[mask]
+            ctx = Xh[-(seq_len - 1):].copy() if seq_len > 1 else None
+            X3d, y3d = make_sliding_windows(Xh, yh, seq_len=seq_len)
+            out[int(h)] = (X3d, y3d, ctx)
+        return out
+
+
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series | np.ndarray,
+        precomputed_windows: dict | None = None,
+    ):
         if not isinstance(X, pd.DataFrame):
             X = pd.DataFrame(X)
 
         hp = self._get_hparams()
         self.seq_len_ = hp["seq_len"]
         self.mode_ = hp["mode"]
+        self.device_ = _resolve_device(self.device)
 
         if self.h_col not in X.columns:
-            raise ValueError(f"Coluna '{self.h_col}' obrigatória em X para DirectLSTMForecaster.")
+            raise ValueError(f"Coluna '{self.h_col}' obrigatória em X.")
 
         self.feature_names_ = [c for c in X.columns if c != self.h_col]
-        y_arr = np.asarray(y, dtype=np.float32).ravel()
-        h_vals = X[self.h_col].astype(int).to_numpy()
-        X_raw = X[self.feature_names_].to_numpy(dtype=np.float32)
+        self.last_train_windows_ = {}
 
-        hs = sorted(np.unique(h_vals))
-        self.last_train_windows_: dict[int, np.ndarray] = {}
+        # ── single change: reuse windows if supplied ────────────────────
+        if precomputed_windows is None:
+            windows = self._prepare_windows(X, y, self.seq_len_, self.mode_)
+        else:
+            windows = precomputed_windows
+        # ────────────────────────────────────────────────────────────────
 
         if self.mode_ == "pooled":
-            X_3d_list, y_list = [], []
-            for h in hs:
-                mask = h_vals == h
-                Xh = self._encode_h(X_raw[mask], h)
-                yh = y_arr[mask]
-                # Guarda os últimos (seq_len - 1) passos do treino para dar contexto à validação
-                if self.seq_len_ > 1:
-                    self.last_train_windows_[h] = Xh[-(self.seq_len_ - 1) :].copy()
-                X_3d_h, y_h = make_sliding_windows(Xh, yh, seq_len=self.seq_len_)
-                X_3d_list.append(X_3d_h)
-                y_list.append(y_h)
-
-            X_all_3d = np.concatenate(X_3d_list, axis=0)
-            y_all = np.concatenate(y_list, axis=0)
+            X_all_3d = np.concatenate([v[0] for v in windows.values()], axis=0)
+            y_all    = np.concatenate([v[1] for v in windows.values()], axis=0)
+            for h, (_, _, ctx) in windows.items():
+                if ctx is not None:
+                    self.last_train_windows_[h] = ctx
 
             self.pooled_model_ = train_torch_lstm(
-                X_all_3d,
-                y_all,
-                hidden_size=hp["hidden_size"],
-                num_layers=hp["num_layers"],
-                dropout=hp["dropout"],
-                lr=hp["lr"],
-                weight_decay=hp["weight_decay"],
-                epochs=hp["epochs"],
-                batch_size=hp["batch_size"],
-                seed=self.random_state,
-            )
+                X_all_3d, y_all,
+                hidden_size=hp["hidden_size"], num_layers=hp["num_layers"],
+                dropout=hp["dropout"], lr=hp["lr"], weight_decay=hp["weight_decay"],
+                epochs=hp["epochs"], batch_size=hp["batch_size"],
+                seed=self.random_state, device=self.device_,
+            ).to(self.device_)
             return self
 
-        # Modo "independent": 28 modelos independentes (igual ao DirectMLPForecaster)
-        def _fit_one(h: int):
-            mask = h_vals == h
-            Xh = X_raw[mask]
-            yh = y_arr[mask]
-            if self.seq_len_ > 1:
-                self.last_train_windows_[h] = Xh[-(self.seq_len_ - 1) :].copy()
-            X_3d_h, y_h = make_sliding_windows(Xh, yh, seq_len=self.seq_len_)
-            net = train_torch_lstm(
-                X_3d_h,
-                y_h,
-                hidden_size=hp["hidden_size"],
-                num_layers=hp["num_layers"],
-                dropout=hp["dropout"],
-                lr=hp["lr"],
-                weight_decay=hp["weight_decay"],
-                epochs=hp["epochs"],
-                batch_size=hp["batch_size"],
-                seed=self.random_state + h,
+        # independent mode
+        def _fit_one(h, X3d, y3d):
+            return h, train_torch_lstm(
+                X3d, y3d,
+                hidden_size=hp["hidden_size"], num_layers=hp["num_layers"],
+                dropout=hp["dropout"], lr=hp["lr"], weight_decay=hp["weight_decay"],
+                epochs=hp["epochs"], batch_size=hp["batch_size"],
+                seed=self.random_state + h, device=self.device_,
             )
-            return h, net
 
-        self.models_ = dict(
-            Parallel(n_jobs=self.n_jobs)(delayed(_fit_one)(h) for h in hs)
+        n_jobs = 1 if self.device_.type == "cuda" else self.n_jobs
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(_fit_one)(h, X3d, y3d) for h, (X3d, y3d, _) in windows.items()
         )
+        self.models_ = {h: net.to(self.device_) for h, net in results}
+        for h, (_, _, ctx) in windows.items():
+            if ctx is not None:
+                self.last_train_windows_[h] = ctx
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:

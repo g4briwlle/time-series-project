@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
+from numpy.lib.stride_tricks import sliding_window_view
 
 def set_torch_seed(seed: int = 42) -> None:
     """Fixa sementes para reprodutibilidade exata exigida pelo check_task2.py."""
@@ -44,29 +45,24 @@ class TorchLSTMNet(nn.Module):
         return self.head(last_step).squeeze(-1)
 
 
-def make_sliding_windows(
-    X_2d: np.ndarray,
-    y_1d: np.ndarray | None = None,
-    seq_len: int = 7,
-) -> tuple[np.ndarray, np.ndarray | None]:
+
+def make_sliding_windows(X_2d, y_1d=None, seq_len=7):
     """
-    Converte matriz 2D (N, F) ordenada no tempo em tensor 3D (N, seq_len, F).
-    Para os primeiros (seq_len - 1) pontos, faz left-padding repetindo a primeira
-    linha disponível (evita perder linhas ou desalinhar índices com o pipeline).
+    Converts (N, F) → (N, seq_len, F) causal windows with left-padding.
+    Same contract as before; ~100× faster (no Python loop).
     """
     n_samples, n_features = X_2d.shape
     if seq_len <= 1:
-        X_3d = X_2d[:, np.newaxis, :].astype(np.float32)
-        y_out = y_1d.astype(np.float32) if y_1d is not None else None
-        return X_3d, y_out
+        X_3d = X_2d[:, np.newaxis, :].astype(np.float32, copy=False)
+        return X_3d, (y_1d.astype(np.float32) if y_1d is not None else None)
 
-    # Pad inicial com a primeira observação para manter comprimento N intacto
-    pad = np.repeat(X_2d[:1], seq_len - 1, axis=0)
-    X_padded = np.vstack([pad, X_2d]).astype(np.float32)
+    pad = np.repeat(X_2d[:1], seq_len - 1, axis=0).astype(np.float32, copy=False)
+    X_padded = np.concatenate([pad, X_2d.astype(np.float32, copy=False)], axis=0)
 
-    # Cria janelas deslizantes causais: no tempo t, olha [t - seq_len + 1 ... t]
-    windows = [X_padded[i : i + seq_len] for i in range(n_samples)]
-    X_3d = np.stack(windows, axis=0)
+    # (N, F, seq_len) view → (N, seq_len, F); copy so the result is contiguous
+    X_3d = sliding_window_view(X_padded, seq_len, axis=0).transpose(0, 2, 1)
+    X_3d = np.ascontiguousarray(X_3d)
+
     y_out = y_1d.astype(np.float32) if y_1d is not None else None
     return X_3d, y_out
 

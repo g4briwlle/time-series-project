@@ -7,7 +7,7 @@ from ..data.prepare_data import (
     expand_train_horizons,
     add_horizon_to_validation,
 )
-from .models_utils import predict_model, compute_metrics, save_outputs
+from ..model_utils import predict_model, compute_metrics, save_outputs
 from ..config import SERIE, VAL_DATES, OUTPUT_DIR
 from .direct_lstm_class import DirectLSTMForecaster
 

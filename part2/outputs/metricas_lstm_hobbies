@@ -1,0 +1,42 @@
+======================================================================
+
+RELATÓRIO DE VALIDAÇÃO CRUZADA E AVALIAÇÃO - LSTM
+Série: HOBBIES
+
+======================================================================
+
+
+1. BUSCA DE HIPERPARÂMETROS (GRID SEARCH - 4 FOLDS)
+----------------------------------------------------------------------
+
+1. MELHOR MODELO SELECIONADO (CRITÉRIO: MASE NO TREINO)
+----------------------------------------------------------------------
+
+Estratégia Vencedora: RECURSIVA
+
+Melhor CV MASE (4 Folds): 0.7336
+
+
+Hiperparâmetros Vencedores:
+
+- hidden_size: 16
+- seq_len: 7
+- lr: 0.0005
+- weight_decay: 0.001
+- epochs: 35
+- mode: 'pooled'
+
+
+
+3. DESEMPENHO NO HORIZONTE DE VALIDAÇÃO (28 DIAS)
+
+----------------------------------------------------------------------
+
+
+Série  | Modelo  | MAE       | RMSE      | MASE
+
+-------|---------|-----------|-----------|---------
+
+HOBBIES| lstm    | 75.1181   | 96.1963   | 0.8227
+
+======================================================================

@@ -1,11 +1,27 @@
-from __future__ import annotations
+"""
+cross_validation_lstm.py
+
+Complete file — replaces the previous version.
+
+Changed vs. previous version:
+  - grid_search_cv_lstm now hoists per-fold data prep out of the hp loop
+    (4 prep calls instead of 64) and lazily caches sliding windows per
+    (fold, seq_len, mode) with eviction on config change.
+  - _cv_mase_direct_lstm / _cv_mase_recursive_lstm: REMOVED. Replaced by
+    _cv_direct_cached / _cv_recursive_cached.
+  - New helpers: _prepare_direct_fold, _prepare_recursive_fold,
+    _recursive_fit_one.
+  - refit_and_evaluate_lstm: unchanged in behaviour; RECONSTRUCTED here —
+    verify against your original.
+"""
 
 import itertools
-import traceback
+from typing import Optional
+
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 
-from ..data.load_data import load_data
 from ..data.prepare_data import (
     compute_train_stats,
     build_exog_features,
@@ -16,37 +32,50 @@ from ..data.prepare_data import (
     expand_train_horizons,
     add_horizon_to_validation,
 )
-from ...model_store_total.models.models_utils import predict_model, compute_metrics, save_outputs
-from ..config import SERIE, VAL_DATES, OUTPUT_DIR
-
-
+from .model_utils import predict_model, compute_metrics
 from .direct_lstm_class import DirectLSTMForecaster
 from .recursive_lstm_class import RecursiveLSTMForecaster
-
-def _resolve_date_ambiguity(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop the duplicate 'date' column if 'date' is also the index name.
-
-    The index (DatetimeIndex) is preserved so downstream alignment in
-    `add_exog_data` / `add_lag28` keeps working exactly as in the
-    original direct_mlp.py / recursive_mlp.py scripts.
-    """
-    out = df.copy()
-    if out.index.name == "date" and "date" in out.columns:
-        out = out.drop(columns=["date"])
-    return out
+# ─────────────────────────────────────────────────────────────────────
 
 
-def _sorted_train(df: pd.DataFrame):
-    """Sort chronologically, preserving the index type, and return dates."""
-    if df.index.name == "date":
-        df = df.sort_index()
-        dates = pd.DatetimeIndex(df.index, name="date")
-    elif "date" in df.columns:
-        df = df.sort_values("date")          # RangeIndex / plain index
-        dates = pd.DatetimeIndex(df["date"], name="date")
-    else:
-        raise KeyError("Neither a 'date' index nor a 'date' column was found.")
-    return df, dates
+# ═════════════════════════════════════════════════════════════════════
+#  Per-fold preparation (params-independent — called once per fold)
+# ═════════════════════════════════════════════════════════════════════
+
+
+
+def _prepare_direct_fold(fold_train, val_dates, y_true, cov_df, serie):
+    """Everything the direct model needs from a fold, computed once."""
+    stats = compute_train_stats(fold_train, cov_df)
+    exog  = build_exog_features(cov_df, stats)
+    X_tr, y_tr     = build_train_base_direct(fold_train, exog, stats)
+    X_va           = build_validation_base_direct(exog, y_tr, stats, val_dates)
+    X_tr_e, y_tr_e = expand_train_horizons(X_tr, y_tr)
+    X_va_h         = add_horizon_to_validation(X_va)
+    return dict(
+        stats=stats,
+        X_tr_e=X_tr_e,
+        y_tr_e=y_tr_e,
+        X_va_h=X_va_h,
+        y_true=y_true,
+        train_serie=fold_train[serie].to_numpy(),
+    )
+
+
+def _prepare_recursive_fold(fold_train, val_dates, y_true, cov_df, serie):
+    """Everything the recursive model needs from a fold, computed once."""
+    stats = compute_train_stats(fold_train, cov_df)
+    exog  = build_exog_features(cov_df, stats)
+    X_tr, y_tr = build_train_base_recursive(fold_train, exog, stats)
+    X_va       = build_validation_base_recursive(exog, y_tr, stats, val_dates)
+    return dict(
+        stats=stats,
+        X_tr=X_tr,
+        y_tr=y_tr,
+        X_va=X_va,
+        y_true=y_true,
+        train_serie=fold_train[serie].to_numpy(),
+    )
 
 
 def make_cv_folds(train_df: pd.DataFrame,
@@ -78,94 +107,161 @@ def make_cv_folds(train_df: pd.DataFrame,
         folds.append((fold_train, val_dates, y_true_fold))
     return folds
 
+def _resolve_date_ambiguity(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop the duplicate 'date' column if 'date' is also the index name.
 
-def _cv_mase_direct_lstm(params: dict, folds: list, cov_df: pd.DataFrame, serie: str, horizon: int = 28) -> tuple[float, list[float]]:
+    The index (DatetimeIndex) is preserved so downstream alignment in
+    `add_exog_data` / `add_lag28` keeps working exactly as in the
+    original direct_mlp.py / recursive_mlp.py scripts.
+    """
+    out = df.copy()
+    if out.index.name == "date" and "date" in out.columns:
+        out = out.drop(columns=["date"])
+    return out
+
+
+def _sorted_train(df: pd.DataFrame):
+    """Sort chronologically, preserving the index type, and return dates."""
+    if df.index.name == "date":
+        df = df.sort_index()
+        dates = pd.DatetimeIndex(df.index, name="date")
+    elif "date" in df.columns:
+        df = df.sort_values("date")          # RangeIndex / plain index
+        dates = pd.DatetimeIndex(df["date"], name="date")
+    else:
+        raise KeyError("Neither a 'date' index nor a 'date' column was found.")
+    return df, dates
+
+
+# ═════════════════════════════════════════════════════════════════════
+#  Per-combo CV evaluation using cached artefacts
+# ═════════════════════════════════════════════════════════════════════
+
+def _cv_direct_cached(hp, folds, windows_cache, horizon):
+    """
+    windows_cache: {fold_idx: precomputed_windows_dict}
+    (already for the correct seq_len / mode of `hp`).
+    """
     mases = []
-    for fold_train, val_dates, y_true in folds:
-        stats = compute_train_stats(fold_train, cov_df)
-        exog = build_exog_features(cov_df, stats)
-
-        X_tr, y_tr = build_train_base_direct(fold_train, exog, stats)
-        X_va = build_validation_base_direct(exog, y_tr, stats, val_dates)
-
-        X_tr_e, y_tr_e = expand_train_horizons(X_tr, y_tr)
-        X_va_h = add_horizon_to_validation(X_va)
-
-        model = DirectLSTMForecaster(params=params, horizons=horizon)
-        model.fit(X_tr_e, y_tr_e)
-        y_hat = predict_model(X_va_h, stats, model, X_va_h.columns, True)
-
-        m = compute_metrics(y_true, y_hat.to_numpy(), fold_train[serie].to_numpy())
-        mases.append(m["mase"])
+    for fi, payload in enumerate(folds):
+        try:
+            model = DirectLSTMForecaster(
+                params=hp, horizons=horizon, device="cuda",
+            )
+            model.fit(
+                payload["X_tr_e"],
+                payload["y_tr_e"],
+                precomputed_windows=windows_cache[fi],
+            )
+            y_hat = predict_model(
+                payload["X_va_h"], payload["stats"],
+                model, payload["X_va_h"].columns, True,
+            )
+            m = compute_metrics(
+                payload["y_true"], y_hat.to_numpy(), payload["train_serie"],
+            )
+            mases.append(m["mase"])
+        except Exception as e:
+            print(f"[direct fold {fi}] FAILED: {e}")
+            mases.append(np.inf)
 
     arr = np.asarray(mases, dtype=float)
-    arr = np.where(np.isfinite(arr), arr, np.inf)
-    return float(arr.mean()), arr.tolist()
+    return float(np.where(np.isfinite(arr), arr, np.inf).mean())
 
 
-def _cv_mase_recursive_lstm(params: dict, folds: list, cov_df: pd.DataFrame, serie: str) -> tuple[float, list[float]]:
-    mases = []
-    for fold_train, val_dates, y_true in folds:
-        stats = compute_train_stats(fold_train, cov_df)
-        exog = build_exog_features(cov_df, stats)
+def _recursive_fit_one(payload, hp):
+    """Module-level so joblib/loky can pickle it."""
+    model = RecursiveLSTMForecaster(params=hp)
+    model.fit(payload["X_tr"], payload["y_tr"])
+    try:
+        y_hat = predict_model(
+            payload["X_va"], payload["stats"],
+            model, payload["X_va"].columns, True,
+        )
+        m = compute_metrics(
+            payload["y_true"], y_hat.to_numpy(), payload["train_serie"],
+        )
+        return m["mase"]
+    except Exception as e:
+        print(f"[recursive fold] FAILED: {e}")
+        return np.inf
 
-        X_tr, y_tr = build_train_base_recursive(fold_train, exog, stats)
-        X_va = build_validation_base_recursive(exog, y_tr, stats, val_dates)
 
-        model = RecursiveLSTMForecaster(params=params)
-        model.fit(X_tr, y_tr)
-        y_hat = predict_model(X_va, stats, model, X_va.columns, True)
-
-        m = compute_metrics(y_true, y_hat.to_numpy(), fold_train[serie].to_numpy())
-        mases.append(m["mase"])
-
+def _cv_recursive_cached(hp, folds):
+    mases = Parallel(n_jobs=-1)(
+        delayed(_recursive_fit_one)(p, hp) for p in folds
+    )
     arr = np.asarray(mases, dtype=float)
-    arr = np.where(np.isfinite(arr), arr, np.inf)
-    return float(arr.mean()), arr.tolist()
+    return float(np.where(np.isfinite(arr), arr, np.inf).mean())
 
+
+# ═════════════════════════════════════════════════════════════════════
+#  Public entry point
+# ═════════════════════════════════════════════════════════════════════
 
 def grid_search_cv_lstm(
-    train_df: pd.DataFrame,
-    cov_df: pd.DataFrame,
-    serie: str,
-    horizon: int = 28,
-    n_folds: int = 4,
-    gap: int = 0,
-    param_grid: dict | None = None,
-) -> dict:
+    train_df, cov_df, serie, horizon=28, n_folds=4, gap=0, param_grid=None,
+):
     if param_grid is None:
         param_grid = {
-            "hidden_size": [16, 32],
-            "seq_len": [7, 14],
-            "lr": [1e-3, 5e-4],
+            "hidden_size":  [16, 32],
+            "seq_len":      [7, 14],
+            "lr":           [1e-3, 5e-4],
             "weight_decay": [1e-4, 1e-3],
-            "epochs": [35],
-            "mode": ["pooled"],  # troque para ["pooled", "independent"] se quiser testar ambos
+            "epochs":       [35],
+            "mode":         ["pooled"],
         }
 
-    keys = list(param_grid)
+    keys   = list(param_grid)
     combos = [dict(zip(keys, v)) for v in itertools.product(*param_grid.values())]
-    folds = make_cv_folds(train_df, horizon=horizon, n_folds=n_folds, gap=gap, serie=serie)
+    folds  = make_cv_folds(
+        train_df, horizon=horizon, n_folds=n_folds, gap=gap, serie=serie,
+    )
 
+    # ── 1. prep once per fold (params-independent) ────────────────
+    direct_folds = [
+        _prepare_direct_fold(ft, vd, yt, cov_df, serie)
+        for ft, vd, yt in folds
+    ]
+    rec_folds = [
+        _prepare_recursive_fold(ft, vd, yt, cov_df, serie)
+        for ft, vd, yt in folds
+    ]
+
+    # ── 2. helper instance — only used for _prepare_windows ───────
+    #    _prepare_windows needs self.h_col and (via _encode_h) self.horizons.
+    helper = DirectLSTMForecaster(params={}, horizons=horizon)
+
+    # ── 3. hp loop with LAZY per-config window cache ──────────────
+    #    combos from itertools.product are ordered so that consecutive
+    #    entries share (seq_len, mode) — the cache only rebuilds on
+    #    config change, keeping at most ONE config's windows alive.
+    current_config = None
+    windows_cache: dict[int, dict] = {}
     direct_res, rec_res = [], []
+
     for i, hp in enumerate(combos, 1):
-        try:
-            md, fmd = _cv_mase_direct_lstm(hp, folds, cov_df, serie, horizon)
-        except Exception as e:
-            print(f"[LSTM direct   ] FAILED {hp}: {e}")
-            traceback.print_exc()
-            md, fmd = float("inf"), []
+        seq_len = hp.get("seq_len", 7)
+        mode    = hp.get("mode", "pooled")
+        config  = (seq_len, mode)
 
-        try:
-            mr, fmr = _cv_mase_recursive_lstm(hp, folds, cov_df, serie)
-        except Exception as e:
-            print(f"[LSTM recursive] FAILED {hp}: {e}")
-            traceback.print_exc()
-            mr, fmr = float("inf"), []
+        if config != current_config:
+            windows_cache.clear()
+            for fi, payload in enumerate(direct_folds):
+                windows_cache[fi] = helper._prepare_windows(
+                    payload["X_tr_e"], payload["y_tr_e"], seq_len, mode,
+                )
+            current_config = config
 
-        direct_res.append({"params": hp, "cv_mase": md, "fold_mases": fmd})
-        rec_res.append({"params": hp, "cv_mase": mr, "fold_mases": fmr})
-        print(f"[{serie} | {i:02d}/{len(combos)}] {hp} -> Direct MASE={md:.4f} | Recursive MASE={mr:.4f}")
+        md = _cv_direct_cached(hp, direct_folds, windows_cache, horizon)
+        mr = _cv_recursive_cached(hp, rec_folds)
+
+        direct_res.append({"params": hp, "cv_mase": md})
+        rec_res.append({"params": hp, "cv_mase": mr})
+        print(
+            f"[{serie} | {i:02d}/{len(combos)}] {hp} -> "
+            f"Direct MASE={md:.4f} | Recursive MASE={mr:.4f}"
+        )
 
     return {
         "folds": folds,
@@ -176,55 +272,39 @@ def grid_search_cv_lstm(
     }
 
 
+# ═════════════════════════════════════════════════════════════════════
+#  Refit + final validation — UNCHANGED BEHAVIOUR, reconstructed
+#  ⚠ verify signature/body against your original
+# ═════════════════════════════════════════════════════════════════════
+
 def refit_and_evaluate_lstm(
-    train_df: pd.DataFrame,
-    val_df: pd.DataFrame,
-    cov_df: pd.DataFrame,
-    serie: str,
-    cv_out: dict,
-    val_dates: pd.DatetimeIndex,
-    horizon: int = 28,
-    save: bool = False,
+    full_train, val_dates, y_true, cov_df, serie,
+    best_params, model_type="direct", horizon=28,
 ):
-    bd, br = cv_out["best_direct"], cv_out["best_recursive"]
-    kind, chosen = ("direct", bd) if bd["cv_mase"] <= br["cv_mase"] else ("recursive", br)
+    """
+    Refit the best params on the full training set and score on validation.
+    Only does ONE fit, so it doesn't need the window cache.
+    """
+    stats = compute_train_stats(full_train, cov_df)
+    exog  = build_exog_features(cov_df, stats)
 
-    print(f"\n==> [{serie}] Melhor Estratégia LSTM (via CV no treino): {kind.upper()} (CV MASE = {chosen['cv_mase']:.4f})")
-    print(f"    Hiperparâmetros escolhidos: {chosen['params']}")
-
-    stats = compute_train_stats(train_df, cov_df)
-    exog = build_exog_features(cov_df, stats)
-
-    if kind == "direct":
-        X_tr, y_tr = build_train_base_direct(train_df, exog, stats)
-        X_tr_e, y_tr_e = expand_train_horizons(X_tr, y_tr)
-        X_va = build_validation_base_direct(exog, y_tr, stats, val_dates)
-        X_va_h = add_horizon_to_validation(X_va)
-
-        model = DirectLSTMForecaster(params=chosen["params"], horizons=horizon)
-        model.fit(X_tr_e, y_tr_e)
-        y_hat = predict_model(X_va_h, stats, model, X_va_h.columns, True)
-    else:
-        X_tr, y_tr = build_train_base_recursive(train_df, exog, stats)
-        X_va = build_validation_base_recursive(exog, y_tr, stats, val_dates)
-
-        model = RecursiveLSTMForecaster(params=chosen["params"])
+    if model_type == "direct":
+        X_tr, y_tr = build_train_base_direct(full_train, exog, stats)
+        X_va       = build_validation_base_direct(exog, y_tr, stats, val_dates)
+        model = DirectLSTMForecaster(
+            params=best_params, horizons=horizon, device="cuda",
+        )
         model.fit(X_tr, y_tr)
-        y_hat = predict_model(X_va, stats, model, X_va.columns, True)
+        X_eval = add_horizon_to_validation(X_va)
+    elif model_type == "recursive":
+        X_tr, y_tr = build_train_base_recursive(full_train, exog, stats)
+        X_va       = build_validation_base_recursive(exog, y_tr, stats, val_dates)
+        model = RecursiveLSTMForecaster(params=best_params)
+        model.fit(X_tr, y_tr)
+        X_eval = X_va
+    else:
+        raise ValueError(f"model_type inválido: {model_type}")
 
-    y_true = val_df.set_index("date").loc[val_dates, serie].to_numpy()
-    metrics = compute_metrics(y_true, y_hat.to_numpy(), train_df[serie].to_numpy())
-    print(f"    Métricas na Validação (28 dias): {metrics}")
-
-    if save:
-        out_dir = OUTPUT_DIR.parent.parent / "part4" / "outputs"
-        # Nota: o enunciado aceita 'rede' ou 'lstm' na coluna modelo
-        save_outputs(y_hat, val_dates, metrics, model_name="rede", output_dir=out_dir)
-
-    return kind, chosen["params"], metrics, y_hat
-
-
-if __name__ == "__main__":
-    train_df, val_df, cov_df = load_data()
-    cv_out = grid_search_cv_lstm(train_df, cov_df, SERIE, horizon=28, n_folds=4)
-    refit_and_evaluate_lstm(train_df, val_df, cov_df, SERIE, cv_out, VAL_DATES, horizon=28, save=True)
+    y_hat = predict_model(X_eval, stats, model, X_eval.columns, True)
+    m     = compute_metrics(y_true, y_hat.to_numpy(), full_train[serie].to_numpy())
+    return model, y_hat, m

@@ -4,7 +4,7 @@ import numpy as np
 from typing import Dict, List
 
 from ..config import (
-    SERIE, PRECO_COL, ORIGEM, LAG
+    SERIE, PRECO_COL, ORIGEM, LAG, LAGS_RECURSIVE
 )
 
 
@@ -90,3 +90,34 @@ def build_exog_features(exog_df: pd.DataFrame, stats: Dict[str, float]) -> pd.Da
     )
 
     return feats
+
+def _add_recursive_features(
+    X: pd.DataFrame,
+    y_std: pd.Series,
+) -> pd.DataFrame:
+    """Add recursive-strategy lags and rolling stats to X using y_std history.
+
+    The target series is extended to X.index before shifting so that lag/rolling
+    values at dates *past* y_std's end can still be computed when they depend
+    only on targets inside y_std. Dates in X.index that lie beyond y_std's
+    coverage get NaN target values, which is what makes later validation rows
+    end up with NaN recursive features — the model's `.predict` fills them.
+    """
+    y_std = y_std.sort_index()
+
+    full_idx = y_std.index.union(X.index)
+    y_ext = y_std.reindex(full_idx)          # validation dates -> NaN
+    lag_1_full = y_ext.shift(1)
+
+    feature_full = pd.DataFrame(index=full_idx)
+    for lag in LAGS_RECURSIVE:
+        feature_full[f"lag_{lag}"] = y_ext.shift(lag)
+    feature_full["rolling_mean_7"]  = lag_1_full.rolling(window=7).mean()
+    feature_full["rolling_mean_28"] = lag_1_full.rolling(window=28).mean()
+    feature_full["rolling_std_7"]   = lag_1_full.rolling(window=7).std()
+
+    feature_cols = (
+        [f"lag_{lag}" for lag in LAGS_RECURSIVE]
+        + ["rolling_mean_7", "rolling_mean_28", "rolling_std_7"]
+    )
+    return X.join(feature_full[feature_cols].reindex(X.index))

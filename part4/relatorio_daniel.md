@@ -56,6 +56,13 @@ Treinar um único modelo MIMO (Multiple Input Multiple Output) que se mostra tã
 
 ### Hiperparâmetros escolhidos após grid-search
 
+**MLP**
+
+```text
+==> Selected model: RECURSIVE  (best CV MASE = 0.7399)
+    hyperparameters: {'hidden_layer_sizes': (32,), 'alpha': 0.0001, 'learning_rate_init': 0.001, 'early_stopping': False}
+```
+
 ## Referências
 1. https://zenodo.org/records/21288702
 2. https://ieeexplore.ieee.org/document/7179007

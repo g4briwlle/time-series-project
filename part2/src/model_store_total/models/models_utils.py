@@ -52,8 +52,16 @@ def save_outputs(
         "series": SERIE, "modelo": model_name, "mae": metrics['mae'], "rmse": metrics['rmse'], "mase": metrics['mase']
     }]).to_csv(metrics_path, index=False)
     
-def predict_model(X_val_h, stats, model, cols):
-    z_hat = model.predict(X_val_h[cols].to_numpy())
+def predict_model(X_val_h, stats, model, cols, with_df: bool = False):
+    """
+    with_df (bool): If True, runs the model with the dataframe, not calling `to_numpy`.
+    """
+    
+    if with_df:
+        z_hat = model.predict(X_val_h[cols])
+    else:
+        z_hat = model.predict(X_val_h[cols].to_numpy())
+    
     y_hat = pd.Series(
         z_hat * stats["y_std"] + stats["y_mean"],
         index=X_val_h.index,
@@ -266,3 +274,17 @@ def tree_and_boosting_recursive_pipeline(model, model_name, output_dir=OUTPUT_DI
 
     save_outputs(y_hat_final, VAL_DATES, validation_metrics, model_name=model_name, output_dir=output_dir)
     print(validation_metrics)
+    
+def _normalize_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """'date' as a plain column, RangeIndex, sorted, Timestamp[ns] dtype."""
+    out = df.copy()
+    if out.index.name == "date" and "date" in out.columns:
+        out = out.drop(columns=["date"])
+    if out.index.name == "date":
+        out = out.reset_index()
+    if "date" not in out.columns:
+        raise KeyError("Expected a 'date' column; none found after normalization.")
+    # Force ns precision so DatetimeIndex `.loc` / slicing agree across frames
+    # (Pandas 3.0 defaults to datetime64[us]; original data may be ns).
+    out["date"] = pd.to_datetime(out["date"]).astype("datetime64[ns]")
+    return out.sort_values("date").reset_index(drop=True)

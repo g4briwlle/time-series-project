@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 from ..config import (
     SERIE, LAG, LAGS_RECURSIVE
 )
-from .data_utils import _ensure_datetime_index, add_lag28
+from .data_utils import _ensure_datetime_index, add_lag28, _add_recursive_features
 
 
 # ---------- base de treino ----------
@@ -82,17 +82,12 @@ def build_train_base_recursive(
     y_std = (y_raw - stats["y_mean"]) / stats["y_std"]
 
     X = add_exog_data(train_df, exog_feats)
-    
-    # Selected recent and seasonal lags
-    for lag in LAGS_RECURSIVE:
-        X[f'lag_{lag}'] = y_std.shift(lag)
-        
-    # Rolling window statistics (computed on lag_1 to avoid looking at current target)
-    X['rolling_mean_7'] = X['lag_1'].rolling(window=7).mean()
-    X['rolling_mean_28'] = X['lag_1'].rolling(window=28).mean()
-    X['rolling_std_7'] = X['lag_1'].rolling(window=7).std()
-    
-    feature_cols = [f'lag_{lag}' for lag in LAGS_RECURSIVE] + ['rolling_mean_7', 'rolling_mean_28', 'rolling_std_7']
+    X = _add_recursive_features(X, y_std)
+
+    feature_cols = (
+        [f"lag_{lag}" for lag in LAGS_RECURSIVE]
+        + ["rolling_mean_7", "rolling_mean_28", "rolling_std_7"]
+    )
     X = X.dropna(subset=feature_cols)
-    
+
     return standardize_train(X, y_std, stats)

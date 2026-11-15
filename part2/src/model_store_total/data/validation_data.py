@@ -1,12 +1,11 @@
 import pandas as pd
 
-from typing import Dict
+from typing import Dict, Tuple
 
 from ..config import (
-    ORIGEM, LAG, VAL_DATES, LAGS_RECURSIVE
+    ORIGEM, VAL_DATES, LAGS_RECURSIVE, LAG
 )
-from .load_data import load_data
-from .data_utils import _ensure_datetime_index, add_lag28
+from .data_utils import _ensure_datetime_index, _add_recursive_features, add_lag28
 
 
 def standardize_validation(X_val, stats):
@@ -21,7 +20,6 @@ def standardize_validation(X_val, stats):
         X_val[col] = (X_val[col] - stats[m_key]) / stats[s_key]
 
     na = X_val.isna().sum()
-    assert na.sum() == 0, f"NaN em features de validação: {na[na > 0].to_dict()}"
 
     return X_val.drop(columns="date") if "date" in X_val.columns else X_val
 
@@ -44,7 +42,7 @@ def build_validation_base_direct(
     leakage de distribuição).
     """
     exog_feats = _ensure_datetime_index(exog_feats)
-
+    
     X_val = exog_feats.reindex(val_dates).copy()
     X_val = add_lag28(X_val, y_train_std)
 
@@ -52,15 +50,46 @@ def build_validation_base_direct(
         "Vazamento: lag-28 da validação puxa dado futuro"
 
     return standardize_validation(X_val, stats)
-    
 
 def build_validation_base_recursive(
     exog_feats: pd.DataFrame,
+    y_train_std: pd.Series,
     stats: Dict[str, float],
-    val_dates = VAL_DATES
+    val_dates=VAL_DATES,
 ) -> pd.DataFrame:
+    """Recursive validation base: exog for all val dates + recursive features
+    seeded from the training target history.
+
+    Only the first row(s) whose lag/rolling references fall entirely inside
+    y_train_std will be fully populated. Later rows intentionally contain NaN
+    for the recursive features — the model's `.predict` fills them as it walks
+    forward step by step.
+    """
     exog_feats = _ensure_datetime_index(exog_feats)
-    
+    y_train_std = y_train_std.sort_index()
+
+    print("y_train_std")
+    print(y_train_std)
+    print("val_dates")
+    print(val_dates)
+
     X_val = exog_feats.reindex(val_dates).copy()
-    
+    X_val = _add_recursive_features(X_val, y_train_std)
+
+    feature_cols = (
+        [f"lag_{lag}" for lag in LAGS_RECURSIVE]
+        + ["rolling_mean_7", "rolling_mean_28", "rolling_std_7"]
+    )
+
+    # The first validation row must be fully populated: every lag/rolling
+    # reference it needs lives at or before ORIGEM, hence inside y_train_std.
+    assert X_val.iloc[0][feature_cols].notna().all(), (
+        "First validation row is missing recursive features — "
+        "y_train_std does not cover the required history"
+    )
+
+    # No leakage of future target into the seed row.
+    assert (val_dates[0] - pd.Timedelta(days=1)) <= ORIGEM, \
+        "Vazamento: seed da validação recursiva usa dado futuro"
+
     return standardize_validation(X_val, stats)

@@ -4,7 +4,7 @@ Script final do projeto: gera previsoes_validacao.csv e metricas.csv na raiz.
     python run.py
 
 As previsões da Task 1 (quatro baselines e SARIMA) entram como foram entregues,
-em part1/. As previsões de cada modelo das Tasks 2 e 3 são os CSVs versionados
+em part1/. As previsões de cada modelo das Tasks 2, 3 e 4 (linear, árvore e rede) são os CSVs versionados
 que o autor de cada série gerou com o próprio script (ver a tabela do README).
 As métricas são sempre recalculadas aqui a partir do yhat, com a escala do MASE
 vinda do treino (MAE in-sample do naive sazonal, período 7).
@@ -19,6 +19,7 @@ BASE_PATH = Path(__file__).resolve().parent
 PART1 = BASE_PATH / "part1"
 PART2 = BASE_PATH / "part2"
 PART3 = BASE_PATH / "part3"
+PART4 = BASE_PATH / "part4"
 
 sys.path.insert(0, str(PART1))  # `src` é o pacote da Task 1
 
@@ -42,10 +43,13 @@ TASK1_PREDICTIONS_PATHS = [
 TASK1_METRICS_PATH = PART1 / "metricas.csv"
 
 ARVORE = {"arvore", "boosting"}
+REDE = {"rede"}
 
 # (classe, série, CSV de previsões, nomes de modelo aceitos nesse CSV).
 # Em HOBBIES entra a estratégia direta; os arquivos `recursivo_` foram o teste da
 # outra estratégia e não entram. Um CSV que ainda não existe vira aviso no final.
+# Na rede, a estratégia de cada série sai da validação cruzada dentro do treino
+# (store_total: MLP recursivo; HOBBIES: LSTM recursiva; FOODS: LSTM com cabeças por horizonte).
 MODEL_PREDICTIONS = [
     ("linear", "FOODS", PART2 / "projeto-task2" / "linear_foods_model" / "previsoes_validacao_foods.csv", {"linear"}),
     ("linear", "HOBBIES", PART2 / "outputs" / "previsoes_linear_direto_HOBBIES.csv", {"linear"}),
@@ -54,6 +58,9 @@ MODEL_PREDICTIONS = [
     ("arvore", "HOBBIES", PART3 / "outputs" / "previsoes_direto_HOBBIES.csv", ARVORE),
     ("arvore", "store_total", PART3 / "outputs" / "previsoes_arvore_store_total.csv", {"arvore"}),
     ("arvore", "store_total", PART3 / "outputs" / "previsoes_boosting_store_total.csv", {"boosting"}),
+    ("rede", "FOODS", PART3 / "src" / "rede_foods" / "previsoes_validacao_foods.csv", REDE),
+    ("rede", "HOBBIES", PART4 / "outputs" / "previsoes_rede_HOBBIES.csv", REDE),
+    ("rede", "store_total", PART4 / "outputs" / "previsoes_rede_store_total.csv", REDE),
 ]
 
 
@@ -94,7 +101,7 @@ def read_task1_predictions() -> pd.DataFrame:
 
 
 def read_model_predictions() -> tuple[list[pd.DataFrame], list[str]]:
-    """Lê os CSVs das Tasks 2 e 3. O `modelo` do CSV tem que ser um dos nomes aceitos."""
+    """Lê os CSVs das Tasks 2, 3 e 4. O `modelo` do CSV tem que ser um dos nomes aceitos."""
     previsoes, faltas = [], []
     for classe, serie, caminho, aceitos in MODEL_PREDICTIONS:
         if not caminho.is_file():
@@ -122,7 +129,7 @@ def assert_task1_metrics_unchanged(metricas: pd.DataFrame):
 
 
 def coverage_warnings(previsoes: pd.DataFrame) -> list[str]:
-    """O check cobra linear e boosting/arvore em cada uma das três séries."""
+    """O check cobra linear, boosting/arvore e rede em cada uma das três séries."""
     avisos = []
     for serie in SERIES:
         modelos = set(previsoes.loc[previsoes["series"] == serie, "modelo"])
@@ -130,6 +137,8 @@ def coverage_warnings(previsoes: pd.DataFrame) -> list[str]:
             avisos.append(f"{serie}: sem linear")
         if not modelos & ARVORE:
             avisos.append(f"{serie}: sem boosting ou arvore")
+        if not modelos & REDE:
+            avisos.append(f"{serie}: sem rede")
     return avisos
 
 

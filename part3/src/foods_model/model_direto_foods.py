@@ -1,6 +1,6 @@
 # model_direto_foods.py
 # Mesma estrutura do modelo direto de HOBBIES (part3/src/hobbies_model), aplicada a FOODS.
-# Hiperparâmetros fixos a priori (meio das grades do HOBBIES), sem busca e sem olhar a validação.
+# Hiperparâmetros fixos a priori (valores das grades do HOBBIES), sem busca e sem olhar a validação.
 import sys
 from pathlib import Path
 import numpy as np

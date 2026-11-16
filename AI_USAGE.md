@@ -99,3 +99,36 @@ Esta seção cobre a integração da entrega (`run.py`, `README.md` e o check) e
 ## Responsabilidade
 
 A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA foi usada como apoio; o escopo e as decisões foram da equipe, e só levamos código para o repositório depois de lê-lo, rodá-lo e conferir os resultados contra o `check_task2.py`.
+
+---
+
+# Task 4: rede (entrega de 15/11)
+
+Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o check e os textos) e o relatório de árvore e boosting de FOODS, que faltava da entrega anterior. Os itens de cada rede (FOODS, HOBBIES e store_total) são acrescentados por quem a escreveu.
+
+## Ferramentas utilizadas
+
+- Claude Code (Anthropic), como apoio na integração: leitura das branches, conferência de números e rascunho de trechos do `run.py`, do README, do relatório de FOODS e da conclusão.
+
+## Onde ajudou
+
+- **Leitura das branches:** levantamento do que cada branch da Task 4 entrega por série (FOODS com a LSTM e store_total com o MLP já na main, HOBBIES com a LSTM numa branch ainda sem PR).
+- **`run.py` e README:** leitura dos CSVs de `rede` por série, conferência do nome do modelo e da série e aviso das séries sem `rede`; linhas novas na tabela de arquivos e scripts e o check com `--ate rede`.
+- **Conferência de números:** o boosting de store_total tinha 204,34 de MAE no commit `5ac3577` e 173,06 na main. A mesma configuração foi reexecutada nas duas estratégias: a direta dá 173,06 e a recursiva dá exatamente os 204,34 do commit antigo, o que mostra que aquele ajuste final saiu do pipeline recursivo. O script de árvore e boosting de FOODS também foi reexecutado e reproduz os CSVs versionados.
+- **Relatório de FOODS (árvore e boosting):** rascunho de `part3/relatorio_kauan.md` a partir do script, dos CSVs e de uma análise de resíduos sobre as previsões.
+- **Conclusão:** rascunho de `part4/conclusao.md` com a comparação de linear, árvore e rede nas três séries, montada a partir de `metricas.csv`.
+- **Check:** execução do `check_task2.py --ate rede` para listar o que ainda falta.
+
+## Exemplos de prompts
+
+- **Conferência:** "Help me with these Daniels concerns from the series work", com a conversa do grupo e as capturas das métricas anexadas.
+- **Entrega:** "start the pr draft for my part", com a mensagem do grupo pedindo o CSV unificado de métricas, os relatórios e as previsões unificados.
+
+## Erros corrigidos
+
+- **Escala do HOBBIES no relatório de FOODS:** o rascunho dizia que o HOBBIES vende cerca de 500 unidades por dia. A média da validação é 538, e o texto passou a dizer cerca de 540.
+- **Comentário do script de FOODS:** o cabeçalho de `model_direto_foods.py` dizia que os hiperparâmetros eram o "meio das grades do HOBBIES", mas `max_depth=8` e `min_samples_leaf=10` da árvore estão nas pontas das grades. O comentário passou a dizer só que são valores das grades, sem mudar nenhum resultado.
+
+## Responsabilidade
+
+A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA foi usada como apoio na integração; o escopo e as decisões foram da equipe, e só levamos código e texto para o repositório depois de lê-los, rodá-los e conferir os resultados contra o `check_task2.py`.

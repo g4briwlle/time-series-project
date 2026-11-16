@@ -237,7 +237,7 @@ def refit_and_evaluate(train_df, val_df, cov_df, serie,
         y_hat = predict_model(X_va_h, stats, model, X_va_h.columns, True)
     else:
         X_tr, y_tr = build_train_base_recursive(train_df, exog, stats)
-    X_va       = build_validation_base_recursive(exog, y_tr, stats, val_dates)
+        X_va       = build_validation_base_recursive(exog, y_tr, stats, val_dates)
         model = RecursiveMLPForecaster(params=chosen["params"])
         model.fit(X_tr, y_tr)
         y_hat = predict_model(X_va, stats, model, X_va.columns, True)

@@ -1,7 +1,5 @@
 # Conclusão de comparação dos modelos (Task 4, entrega de 15/11)
 
-> **Rascunho do PR.** A rede de HOBBIES ainda não está nas tabelas, porque a branch `part4/gabi/lstm-model` não foi mergeada. As tabelas saem de `metricas.csv` e são regeradas depois desse merge. Apagar esta nota antes de fechar.
-
 ## Como as métricas foram calculadas
 
 A avaliação usa os 28 dias de validação (28/03/2016 a 24/04/2016), com origem em 27/03/2016. Os modelos são ajustados só com o treino e as métricas são calculadas só nesse horizonte. MAE, RMSE e MASE são recalculados pelo `run.py` a partir do `yhat` de cada modelo, sem copiar os valores dos arquivos de quem ajustou cada série. Por isso os números desta conclusão são os de `metricas.csv`, e um relatório individual pode diferir deles na segunda casa decimal.
@@ -25,11 +23,10 @@ As tabelas trazem as três classes (`linear`, `arvore` ou `boosting`, e `rede`) 
 
 ### HOBBIES
 
-A rede entra aqui quando a branch da LSTM for mergeada.
-
 | Modelo | MAE | RMSE | MASE | MAE vs naive sazonal | MAE vs SARIMA |
 |---|---:|---:|---:|---:|---:|
 | `arvore` | 72,97 | 94,89 | 0,799 | −28,6% | −7,0% |
+| `rede` | 75,12 | 96,20 | 0,823 | −26,5% | −4,3% |
 | `boosting` | 75,47 | 95,09 | 0,827 | −26,2% | −3,8% |
 | `sarima` | 78,47 | 95,08 | 0,859 | −23,3% |  |
 | `linear` | 85,09 | 103,09 | 0,932 | −16,8% | +8,4% |
@@ -48,24 +45,24 @@ A rede entra aqui quando a branch da LSTM for mergeada.
 
 ## Linear, árvore, rede, naive sazonal e SARIMA
 
-- **Naive sazonal:** nenhum dos modelos das tabelas perde para ele, em nenhuma série e em nenhuma das três métricas. A rede é a que mais se afasta dele em FOODS (MAE 63,2% menor) e o boosting em store_total (62,3% menor).
-- **SARIMA:** a rede ganha dele nas duas séries em que já entrou, FOODS (MAE 29,6% menor) e store_total (18,4% menor). Perdem para o SARIMA, nas três métricas, a árvore e o boosting em FOODS (MAE 8,9% e 2,9% maior), o linear em HOBBIES (8,4% maior) e a árvore em store_total (13,8% maior). Em HOBBIES o boosting perde só no RMSE, por 0,01 (95,09 contra 95,08).
-- **Melhor modelo por série:** na rede de FOODS (MASE 0,370), no boosting em store_total (0,398) e, por enquanto, na árvore em HOBBIES (0,799).
-- **O que muda de série para série:** em FOODS a rede e o linear ficam à frente do SARIMA, e as duas classes de árvore ficam atrás. Em store_total o boosting fica à frente de todos, a rede (MASE 0,510) fica entre o linear e o SARIMA e a árvore única (0,711) fica atrás do SARIMA. Em HOBBIES todos os MASE ficam entre 0,80 e 0,93, mais perto do naive sazonal (1,120) do que nas outras séries.
+- **Naive sazonal:** nenhum dos modelos das tabelas perde para ele, em nenhuma série e em nenhuma das três métricas. A rede é a que mais se afasta dele em FOODS (MAE 63,2% menor) o boosting em store_total (62,3% menor) e a árvore em HOBBIES (28,6% menor).
+- **SARIMA:** a rede ganha dele no MAE e no MASE nas três séries: FOODS (MAE 29,6% menor), store_total (18,4% menor) e HOBBIES (4,3% menor). Em HOBBIES ela perde no RMSE, por 1,12 (96,20 contra 95,08). Perdem para o SARIMA, nas três métricas, a árvore e o boosting em FOODS (MAE 8,9% e 2,9% maior), o linear em HOBBIES (8,4% maior) e a árvore em store_total (13,8% maior). Em HOBBIES o boosting perde só no RMSE, por 0,01 (95,09 contra 95,08).
+- **Melhor modelo por série:** na rede de FOODS (MASE 0,370), no boosting em store_total (0,398) e na árvore em HOBBIES (0,799), com a rede em segundo lugar (0,823).
+- **O que muda de série para série:** em FOODS a rede e o linear ficam à frente do SARIMA, e as duas classes de árvore ficam atrás. Em store_total o boosting fica à frente de todos, a rede (MASE 0,510) fica entre o linear e o SARIMA e a árvore única (0,711) fica atrás do SARIMA. Em HOBBIES todos os MASE ficam entre 0,80 e 0,93 (a rede em 0,823), mais perto do naive sazonal (1,120) do que nas outras séries.
 - **Ressalva:** é uma única janela de 28 dias, com quatro repetições de cada dia da semana. Diferenças pequenas, como o boosting contra o SARIMA em FOODS (2,9% no MAE), não bastam para afirmar uma ordem.
 
 ## A rede em cada série
 
 - **FOODS:** LSTM com cabeças densas por horizonte, que prevê os 28 dias de uma vez, com 56 dias de histórico e 20 épocas, escolhidos em três cortes internos que terminam antes da origem. Texto em [part3/relatorio_foods.md](../part3/relatorio_foods.md).
 - **store_total:** MLP recursivo de uma camada oculta de 32 neurônios, escolhido pela validação cruzada dentro do treino (MASE de CV 0,7399). Texto em [part4/relatorio_daniel.md](relatorio_daniel.md).
-- **HOBBIES:** LSTM recursiva, escolhida por validação cruzada com quatro cortes. Texto em `part4/relatorio_gabi.md`, que chega com a branch `part4/gabi/lstm-model`.
+- **HOBBIES:** LSTM recursiva de uma camada com 16 unidades e janela de 7 dias, escolhida por validação cruzada com quatro dobras (MASE de CV 0,7336). Texto em [part4/relatorio_gabi.md](relatorio_gabi.md).
 
 ## Texto de cada série
 
 | Série | Linear | Árvore e boosting | Rede |
 |---|---|---|---|
 | FOODS | [part2/conclusao.md](../part2/conclusao.md) | [part3/relatorio_kauan.md](../part3/relatorio_kauan.md) | [part3/relatorio_foods.md](../part3/relatorio_foods.md) |
-| HOBBIES | [part2/conclusao.md](../part2/conclusao.md) | [part3/relatorio_gabi.md](../part3/relatorio_gabi.md) | `part4/relatorio_gabi.md` |
+| HOBBIES | [part2/conclusao.md](../part2/conclusao.md) | [part3/relatorio_gabi.md](../part3/relatorio_gabi.md) | [part4/relatorio_gabi.md](relatorio_gabi.md) |
 | store_total | [part2/conclusao.md](../part2/conclusao.md) | [part3/report_daniel.md](../part3/report_daniel.md) | [part4/relatorio_daniel.md](relatorio_daniel.md) |
 
 ## Organização dos arquivos

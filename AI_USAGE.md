@@ -104,36 +104,44 @@ A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA foi usada co
 
 # Task 4: rede (entrega de 15/11)
 
-Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o check, os textos e os gráficos da rede) e o relatório de árvore e boosting de FOODS, que faltava da entrega anterior. Os itens de cada rede (FOODS, HOBBIES e store_total) são acrescentados por quem a escreveu.
+Esta seção cobre só os commits em que o Claude aparece como coautor do Kauan, listados abaixo. O resto da Task 4 não está aqui: as redes de FOODS, HOBBIES e store_total e os relatórios de cada autor são deles. O rascunho desta seção também foi feito com o Claude.
+
+| Commits | PR | O que são |
+|---|---|---|
+| `7f274e7`, `135d84e` | #21 | `rede` no `run.py`, no README e nos dois CSVs da raiz; `torch` no `requirements.txt` |
+| `6f2b4b2` | #21 | relatório de árvore e boosting de FOODS (`part3/relatorio_kauan.md`) |
+| `259a075`, `0c98c68` | #21 | seção da Task 4 deste arquivo e conclusão unificada (`part4/conclusao.md`) |
+| `6f0361b` | #23, já na main | script e figuras da rede (`part4/src/plot_rede_diagnostico.py`, `part4/figures/`) |
+| `9a14e80` | #22, já na main | correção das afirmações do relatório do store_total que o código não sustenta |
+
+Também carregam o trailer de coautoria o commit de merge do #22 (`d821a9d`) e os commits `b3cfa03` e `caa4723`, que acrescentaram os gráficos ao #21 e os tiraram de novo para o #23 (efeito nulo).
 
 ## Ferramentas utilizadas
 
-- Claude Code (Anthropic), como apoio na integração: leitura das branches, conferência de números, revisão de PR e rascunho de trechos do `run.py`, do README, do relatório de FOODS, da conclusão e do script de gráficos da rede.
+- Claude Code (Anthropic), usado pelo Kauan nas partes dele da entrega: integração, relatório de FOODS, conclusão, este arquivo, gráficos e revisão do PR do store_total.
 
 ## Onde ajudou
 
-- **Leitura das branches:** levantamento do que cada branch da Task 4 entrega por série (FOODS com a LSTM e store_total com o MLP já na main, HOBBIES com a LSTM numa branch ainda sem PR).
-- **`run.py` e README:** leitura dos CSVs de `rede` por série, conferência do nome do modelo e da série e aviso das séries sem `rede`; linhas novas na tabela de arquivos e scripts e o check com `--ate rede`.
-- **Conferência de números:** o boosting de store_total tinha 204,34 de MAE no commit `5ac3577` e 173,06 na main. A mesma configuração foi reexecutada nas duas estratégias: a direta dá 173,06 e a recursiva dá exatamente os 204,34 do commit antigo, o que mostra que aquele ajuste final saiu do pipeline recursivo. O script de árvore e boosting de FOODS também foi reexecutado e reproduz os CSVs versionados.
-- **Relatório de FOODS (árvore e boosting):** rascunho de `part3/relatorio_kauan.md` a partir do script, dos CSVs e de uma análise de resíduos sobre as previsões.
-- **Conclusão:** rascunho de `part4/conclusao.md` com a comparação de linear, árvore e rede nas três séries, montada a partir de `metricas.csv`.
-- **Gráficos da rede:** rascunho de `part4/src/plot_rede_diagnostico.py`, adaptado do script de árvore e boosting (`part3/src/plot_arvore_diagnostico.py`): barras de MAE, RMSE e MASE com a rede, previsões de todos os modelos e resíduos da rede com ACF, Ljung-Box e resíduo médio por dia da semana. Esta era a parte do Henzo; foi gerada aqui e está num PR próprio (#23), onde ele revisa e aprova.
-- **Check:** execução do `check_task2.py --ate rede` para listar o que ainda falta.
-- **Revisão do PR de store_total (#22):** conferência do relatório de Daniel contra o código. O `recursive_mlp.py` foi reexecutado numa cópia limpa da main e reproduz o CSV versionado (diferença máxima de 9e-13). O CV do MLP também reproduz o MASE de 0,7399 (dobras 0,994, 0,706, 0,528 e 0,732), depois de indentar a linha 240 de `cross_validation.py`, que dá `IndentationError`. A conferência mostrou que o texto descrevia features, grade e uma explicação do CV que o código não sustenta, e as perguntas foram para o autor no próprio PR.
+O que cada um fez nos commits da tabela:
+
+- **Integração (`7f274e7`, `135d84e`).** Claude: escreveu a leitura dos CSVs de `rede` no `run.py` e o aviso de série sem `rede`, as linhas do README e o `--ate rede`; rodou o `run.py` para gerar as linhas de `rede` de FOODS e store_total em `metricas.csv` e `previsoes_validacao.csv`; viu que o `requirements.txt` não listava o `torch`, que a LSTM de FOODS importa. Kauan: é o responsável pela integração no grupo (CSVs unificados, README e check), levou as mensagens do grupo com o que faltava entregar e pediu o rascunho do PR da parte dele.
+- **Relatório de FOODS (`6f2b4b2`).** Claude: rascunhou o texto a partir do script, dos CSVs e de uma análise de resíduos, e reexecutou `model_direto_foods.py` para conferir que reproduz os CSVs. Kauan: é o autor do modelo de árvore e boosting de FOODS (Task 3), que estava sem relatório.
+- **Conclusão e este arquivo (`259a075`, `0c98c68`).** Claude: montou as tabelas por série a partir de `metricas.csv`, rascunhou a comparação de linear, árvore e rede com o naive sazonal e o SARIMA e o primeiro rascunho desta seção. Kauan: a conclusão unificada e o `AI_USAGE.md` são partes dele no grupo, e foi ele quem pediu os rascunhos.
+- **Gráficos (`6f0361b`).** Claude: escreveu `plot_rede_diagnostico.py`, adaptando o script de gráficos de árvore e boosting da Task 3, gerou as três figuras e conferiu que elas saem idênticas dos CSVs da consolidação. Kauan: pediu os gráficos (barras de métricas, previsões e resíduos), definiu que ficariam num PR separado da consolidação e mandou o PR para a revisão de um colega, que fez o merge.
+- **Revisão do relatório do store_total (`9a14e80`).** Claude: conferiu o relatório contra o código (reexecutou `recursive_mlp.py`, que reproduz o CSV com diferença máxima de 9e-13 e o MASE de CV de 0,7399) e reescreveu os trechos que o código não sustenta (features, explicação do CV, a frase sobre quando a validação é lida e o lag 28). Kauan: decidiu revisar o PR do colega, escolheu o que perguntar ao autor no comentário do PR e fez o merge.
 
 ## Exemplos de prompts
 
+- **Integração:** "start the pr draft for my part", com a mensagem do grupo pedindo o CSV unificado de métricas, os relatórios e as previsões unificados.
 - **Conferência:** "Help me with these Daniels concerns from the series work", com a conversa do grupo e as capturas das métricas anexadas.
-- **Entrega:** "start the pr draft for my part", com a mensagem do grupo pedindo o CSV unificado de métricas, os relatórios e as previsões unificados.
-- **Revisão:** "Review daniels pr and ask him anything askable or merge it", seguido de "and update consolidation pr".
-- **Gráficos:** "Do Henzo's part and tag him for review and sign off", seguido de "put the henzo part in a separate pr from consolidation for henzo give the sign off as I asked".
+- **Revisão:** "Review daniels pr and ask him anything askable or merge it".
 
 ## Erros corrigidos
 
-- **Escala do HOBBIES no relatório de FOODS:** o rascunho dizia que o HOBBIES vende cerca de 500 unidades por dia. A média da validação é 538, e o texto passou a dizer cerca de 540.
+- **Escala do HOBBIES no relatório de FOODS:** o rascunho do Claude dizia que o HOBBIES vende cerca de 500 unidades por dia. A média da validação é 538, e o texto passou a dizer cerca de 540.
 - **Comentário do script de FOODS:** o cabeçalho de `model_direto_foods.py` dizia que os hiperparâmetros eram o "meio das grades do HOBBIES", mas `max_depth=8` e `min_samples_leaf=10` da árvore estão nas pontas das grades. O comentário passou a dizer só que são valores das grades, sem mudar nenhum resultado.
 - **`torch` fora do `requirements.txt`:** a LSTM de FOODS, que já está na main, importa `torch`, e o `requirements.txt` não o listava, então o README não bastava para refazer a rede. O `torch` entrou no `requirements.txt` e o README avisa que só as LSTMs o usam.
 
 ## Responsabilidade
 
-A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA foi usada como apoio na integração; o escopo e as decisões foram da equipe, e só levamos código e texto para o repositório depois de lê-los, rodá-los e conferir os resultados contra o `check_task2.py`.
+O Kauan se responsabiliza pelos commits da tabela, incluindo o que o Claude rascunhou neles. O Claude escreveu rascunhos de código e de texto; o escopo, as decisões e o merge foram do Kauan, e só entrou no repositório o que foi lido, rodado e conferido contra o `check_task2.py`.

@@ -1,71 +1,98 @@
-## Modelos
+## Classe rede — `store_total`
 
-Os modelos escolhidos para implementação e teste de previsões sobre a série **store_total** são o MLP e o LSTM, o motivo de escolha de cada um explicado em sua respectiva seção.
+### Modelo e estratégia
 
-Para cada modelo foi escolhida uma grid de hiperparâmetros com 3 a 4 hiperparâmetros diferentes, também justificados abaixo.
+MLP em scikit-learn (`MLPRegressor`), com um ajuste por série. Para `store_total`, foram implementadas as duas estratégias — **direta** (um modelo por horizonte) e **recursiva** (um modelo one-step realimentado) — e a escolha entre elas foi feita pelo erro médio na validação cruzada temporal interna, restrita ao treino até 2016-03-27. A recursiva venceu (CV MASE = 0,7399) e é a que entra em `metricas.csv`. Na recursiva, a previsão de cada dia retorna como lag do dia seguinte; em nenhum passo o y observado no horizonte de validação entra como feature — o que retorna é sempre ŷ do próprio modelo.
 
-O treinamento e teste de ambos os modelos compara o desempenho da abordagem direta com a recursiva no conjunto de treinamento, escolhendo a que apresenta menor MASE no conjunto de treinamento. Cada um dos modelos segue uma implementação ligeiramente diferente para a abordagem direta.
+### Features
 
-### MLP
+`build_exog_features` constrói as entradas exógenas: dummies de dia da semana; `snap_CA`; um indicador binário `is_event` e dummies por tipo de evento (`event_type_1` e `event_type_2` combinados); e `preco_store_total` padronizado. Na recursiva, `_add_recursive_features` soma a elas os lags abaixo e três janelas móveis sobre a série-alvo padronizada — `rolling_mean_7`, `rolling_mean_28` e `rolling_std_7`.
 
-**Motivo da escolha**
+Ficaram de fora `event_name_1`, `event_name_2`, `preco_FOODS` e `preco_HOBBIES`: o modelo usa os tipos de evento, não os nomes (cada nome aparece só algumas vezes em ~1.900 dias), e só o preço da própria série. A série-alvo e `preco_store_total` foram padronizados com média e desvio calculados somente no treino; a mesma transformação foi aplicada ao horizonte de validação. As janelas móveis na recursiva são construídas com dados até 2016-03-27 na origem e, depois, com as previsões do próprio modelo — nunca com y observado.
 
-Entre os 4 modelos disponíveis para essa fase, *RNN*, *LSTM* e *Transformer* seguem todos uma lógica parecida de modelar diretamente dependências temporais que dão pesos diferentes a dados ao longo do tempo. Dessas três, a escolha pela LSTM é justificada mais abaixo. Como a *MLP* é fundalmentalmente diferente, por não modelar dependências temporais mas fazer apenas uma tarefa de regressão, me parece um contraponto natural à arquitetura da LSTM a ser testado também na previsão da série **store_total**.
+### Lags
 
-**Abordagem direta**
+`[1, 2, 3, 4, 5, 6, 7, 14, 21, 28]` — cobre um ciclo semanal completo, dois ciclos e um mensal.
 
-Serão treinados 28 modelos, cada um especializado na previsão de um horizonte de tempo diferente a partir dos dados de entrada. Essa escolha se dá devido a escassez de dados em relação a quantidade de janelas de previsão e pela relativa facilidade de treinar várias MLPs em paralelo ao invés de tentar ajustar uma única para todos os tamanhos de horizontes diferentes.
+### Grade e validação cruzada
 
-**Hiperparâmetros**
+A busca foi exaustiva sobre `hidden_layer_sizes` ∈ `{(32,), (64,)}` × `alpha` ∈ `{1e-4, 1e-3, 1e-2, 1e-1}` × `learning_rate_init` ∈ `{1e-4, 1e-3, 1e-2}`, totalizando 24 combinações.
 
-| Hiperparâmetro | O que controla | Faixa típica / observação |
-|---|---|---|
-| **`hidden_layer_sizes`** | Arquitetura (nº de camadas e neurônios) | Comece com uma camada oculta pequena, ex.: `(32,)` ou `(64,)`. Só aumente se houver underfitting evidente no treino. |
-| **`alpha`** | Regularização L2 | Controla o overfitting. Valores comuns: `1e-4` a `1e-1` (escala log). |
-| **`learning_rate_init`** | Taxa de aprendizado inicial (para `adam`/`sgd`) | `1e-3` é o padrão; testar `1e-4` e `1e-2` ao redor. |
+A validação cruzada usa folds expansivos próprios (`make_cv_folds`): 4 dobras de 28 dias cada, cobrindo os últimos 112 dias do treino (2015-12-07 a 2016-03-27). Cada dobra treina em tudo que antecede sua janela e valida nos 28 dias seguintes; a métrica de seleção é o MASE médio nas 4 dobras. Nenhuma dobra toca o horizonte de validação publicado (2016-03-28 a 2016-04-24).
 
-### LSTM
+### Critério de parada
 
-**Motivo da escolha**
+`early_stopping=False` foi mantido para que o `MLPRegressor` não crie nenhuma fatia interna de validação. O treino para por `max_iter=1000` (teto) ou quando a perda de treino não melhora mais que `tol=1e-4` por `n_iter_no_change=10` épocas consecutivas — ambos critérios sobre o próprio treino, sem contato com o horizonte publicado.
 
-Foi observado empiricamente que o modelo *Transformer vanilla* (sem um fine-tuning específico para a tarefa), começa a apresentar ganhos consistentes de desempenho sober a LSTM sem overfitting com cerca de 10.000 pontos de dados, uma quantidade muito maior do que a disponível. A LSTM, em contrapartida, apresenta uma melhor eficiência amostral, com bom desempenho 500 a 1.000 observações [1].
+### Resultado (validação, 28 dias)
 
-A RNN, por sua vez, também apresenta bastante eficiência amostral, mas, devido ao *vanishing gradient*, não consegue modelar bem uma dependência temporal com mais de 5 passos atrás [2, 3]. Isso leva a um aproveitamente subótimo tanto da sazonalidade semanal conhecida da série de dados quanto da influência de variáveis exógenas, em grande maioria anuais ou mensais.
+MAE 221,89, RMSE 291,66, MASE 0,510.
 
-Com isso, a escolha natural que se contrapõe à MLP para o presente problema de previsão é a **LSTM**, que 
+| Modelo | MAE | RMSE | MASE |
+|---|---:|---:|---:|
+| naive_sazonal | 459,18 | 655,47 | 1,056 |
+| sarima | 271,76 | 359,02 | 0,625 |
+| **rede (MLP recursivo)** | **221,89** | **291,66** | **0,510** |
 
-**Abordagem Direta**
+### Comparação
 
-A literatura comparativa [4, 5] indica que o MIMO é, na maioria dos cenários sem outliers, tão preciso ou mais preciso que a estratégia direta com modelos separados, além de ser computacionalmente mais eficiente por compartilhar representações entre todos os horizontes. A estratégia direta permanece como alternativa robusta apenas quando os dados contêm outliers significativos, o que não é o caso predominante nesta série.
+A rede supera o naive sazonal nas três métricas (−51,7% em MAE, −55,5% em RMSE, −51,7% em MASE) e supera também o SARIMA nas três (−18,4% em MAE, −18,8% em RMSE, −18,4% em MASE). Não há série ou métrica em que a rede perca para o naive sazonal em `store_total`.
 
-**Hiperparâmetros**
+### Forma do erro
 
-| Hiperparâmetro | Valores típicos para busca | Observação |
-|---|---|---|
-| **Número de camadas LSTM** | `[1, 2]` (raramente 3) | Redes mais profundas aumentam o risco de overfitting com ~1.900 pontos. Comece com 1 camada. |
-| **Número de neurônios por camada** | `[32, 64, 128]` | 32–128 é a faixa mais comum. Valores acima de 256 são arriscados para o seu tamanho de dados. |
-| **Dropout** | `[0.0, 0.1, 0.2, 0.3]` | Essencial para regularizar. Taxas acima de 0.3 podem prejudicar a aprendizagem de dependências longas. |
-| **Learning rate (Adam)** | `[0.0005, 0.001, 0.005]` | Valores baixos são mais estáveis; valores altos convergem mais rápido, mas com risco de oscilação. |
-| **Tamanho da janela de entrada (*window size*)** | `[7, 14, 21, 28]` | A janela deve capturar pelo menos um ciclo semanal (7 dias). Testar múltiplos de 7 é uma escolha natural para a sazonalidade semanal. |
+A razão RMSE/MAE é 1,31 para a rede, contra 1,43 no naive sazonal e 1,32 no SARIMA: a distribuição de erros da rede é parecida com a do SARIMA, com concentração moderada — há dias com erro acima da média, mas sem cauda extrema dominante.
 
-**Implementação da Estratégia direta** 
+### CV vs. validação
 
-Treinar um único modelo MIMO (Multiple Input Multiple Output) que se mostra tão bom quanto ou melhor que 28 modelos, com uma eficiência computacional muito melhor dado o escopo do trabalho.
+O MASE de validação cruzada interna (0,740) é pior que o MASE no horizonte publicado (0,510). As 4 dobras avaliam os últimos 112 dias do treino (2015-12-07 a 2016-03-27); o início de 2011 entra apenas como treino, não como avaliação. Por dobra, o MASE é 0,994 / 0,706 / 0,528 / 0,732. A dobra 0 contém o Natal de 2015 (25/12, y=0), em que o modelo erra 2.319 unidades; sem esse dia, a dobra 0 vai de 0,994 para 0,833, e a média do CV cai de 0,740 para 0,700. O que sobra é variação entre janelas: sem o Natal as dobras vão de 0,528 a 0,833, e a validação (0,510) fica logo abaixo da menor delas. Não dá para atribuir a diferença a uma janela mais fácil: o naive sazonal tem MASE 1,056 na validação e 1,018 em média nas dobras sem o 25/12, ou seja, as janelas têm dificuldade parecida para o baseline. O que importa para o critério de split é que o modelo não foi escolhido pelo erro na validação publicada: a estratégia e os hiperparâmetros saem do CV dentro do treino, e `refit_and_evaluate` só calcula a métrica do horizonte depois de escolher.
 
-## Métricas
+### Caveat da recursiva com lag 28
 
-### Hiperparâmetros escolhidos após grid-search
+No passo 28, o lag 28 ainda é o y observado do último dia de treino (2016-03-27); os demais lags (1 a 7, 14 e 21) e as janelas móveis já são previsões do próprio modelo. Ou seja, o contexto mais antigo ainda é real, mas as demais entradas derivadas da série já são previsões. Esse é o custo conhecido da recursiva, e é justamente por isso que a direta também foi implementada e comparada no CV interno; a recursiva venceu nesta série, o que é uma propriedade dos dados, não uma garantia geral.
 
-**MLP**
+### Comparação com as demais classes
 
-```text
-==> Selected model: RECURSIVE  (best CV MASE = 0.7399)
-    hyperparameters: {'hidden_layer_sizes': (32,), 'alpha': 0.0001, 'learning_rate_init': 0.001, 'early_stopping': False}
+Em `store_total`, a `rede` (MAE 221,89) fica atrás do `linear` (198,89) e do `boosting` (173,06). A rede supera os dois baselines da Task 1, mas não é a classe de melhor desempenho nesta série. É um resultado comum em dados tabulares de tamanho moderado (~1.900 pontos), em que métodos de árvore com boosting costumam ser competitivos com redes neurais. A rede foi mantida porque a Task 4 pede a classe e porque a comparação entre as três classes faz parte do que se pede.
+
+# AI_USAGE
+
+Ferramentas usadas (Item 1): Python 3.x com scikit-learn (MLP), pandas/numpy para manipulação e joblib para paralelização do grid search. Usamos DeepSeek como apoio de redação, revisão de código e comparação de arquiteturas; nenhuma previsão ou métrica foi gerada diretamente pela IA sem execução local e verificação contra o código.
+
+Onde ajudou (item 2): features (codificação de eventos, escolha dos lags múltiplos de 7), rede (comparação MLP × LSTM × Transformer e decisão por eficiência amostral).
+
+Prompts representativos (item 3):
+
+"Compare MLP, LSTM e Transformer para vendas diárias com ~1.900 pontos de treino e horizonte de 28 dias; qual é defensável e por quê?" — A resposta sugeriu Transformer; o grupo descartou com base na literatura de eficiência amostral e manteve MLP/LSTM.
+
+````md
+I think the dataframe has bot the index and a column as "dates":
+
+```bash
+Traceback (most recent call last):
+  File "<frozen runpy>", line 203, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/daniel/desktop/graduacao/series-temporais/projeto/time-series-project/part2/src/model_store_total/models/mlp/cross_validation.py", line 220, in <module>
+    cv_out = grid_search_cv(train_df, cov_df, SERIE,horizon=28, n_folds=4, gap=0, n_jobs=-1)
+  File "/home/daniel/desktop/graduacao/series-temporais/projeto/time-series-project/part2/src/model_store_total/models/mlp/cross_validation.py", line 139, in grid_search_cv
+    folds = make_cv_folds(train_df, horizon=horizon, n_folds=n_folds, gap=gap)
+  File "/home/daniel/desktop/graduacao/series-temporais/projeto/time-series-project/part2/src/model_store_total/models/mlp/cross_validation.py", line 42, in make_cv_folds
+    df = train_df.sort_values("date").reset_index(drop=True)
+         ~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "/home/daniel/desktop/graduacao/series-temporais/projeto/time-series-project/.venv/lib/python3.14/site-packages/pandas/core/frame.py", line 9330, in sort_values
+    k = self._get_label_or_level_values(by[0], axis=axis)
+  File "/home/daniel/desktop/graduacao/series-temporais/projeto/time-series-project/.venv/lib/python3.14/site-packages/pandas/core/generic.py", line 1701, in _get_label_or_level_values
+    self._check_label_or_level_ambiguity(key, axis=axis)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/daniel/desktop/graduacao/series-temporais/projeto/time-series-project/.venv/lib/python3.14/site-packages/pandas/core/generic.py", line 1661, in _check_label_or_level_ambiguity
+    raise ValueError(msg)
+ValueError: 'date' is both an index level and a column label, which is ambiguous.
 ```
+````
+- O modelo sugeriu uma normalização nas funções que manipulam os dados que corrigia a ambiguidade gerada
 
-## Referências
-1. https://zenodo.org/records/21288702
-2. https://ieeexplore.ieee.org/document/7179007
-3. https://theses.hal.science/tel-01470466v2
-4. https://link.springer.com/article/10.1007/s10994-025-06875-1#2
-5. https://www.socolar.com/Article/Index?aid=100083871144&jid=100000004881
+Erro corrigido (item 4):
+
+"A primeira versão padronizava série e preços com média e desvio de treino + validação concatenados. Corrigido para treino apenas, antes de gerar yhat."
+
+
+Responsabilidade (Item 5): O grupo assume responsabilidade integral pelo código, pelas previsões e pelas métricas entregues. Todas as sugestões da IA foram revisadas, executadas e validadas contra o código antes de entrar no relatório. Os erros listados no item 4 foram identificados e corrigidos pelo grupo. Nenhuma métrica foi copiada de resposta de IA sem reprodução local.

@@ -104,11 +104,11 @@ A equipe se responsabiliza pelo conteúdo entregue nesta Task. A IA foi usada co
 
 # Task 4: rede (entrega de 15/11)
 
-Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o check e os textos) e o relatório de árvore e boosting de FOODS, que faltava da entrega anterior. Os itens de cada rede (FOODS, HOBBIES e store_total) são acrescentados por quem a escreveu.
+Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o check, os textos e os gráficos da rede) e o relatório de árvore e boosting de FOODS, que faltava da entrega anterior. Os itens de cada rede (FOODS, HOBBIES e store_total) são acrescentados por quem a escreveu.
 
 ## Ferramentas utilizadas
 
-- Claude Code (Anthropic), como apoio na integração: leitura das branches, conferência de números, revisão de PR e rascunho de trechos do `run.py`, do README, do relatório de FOODS e da conclusão.
+- Claude Code (Anthropic), como apoio na integração: leitura das branches, conferência de números, revisão de PR e rascunho de trechos do `run.py`, do README, do relatório de FOODS, da conclusão e do script de gráficos da rede.
 
 ## Onde ajudou
 
@@ -117,6 +117,7 @@ Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o c
 - **Conferência de números:** o boosting de store_total tinha 204,34 de MAE no commit `5ac3577` e 173,06 na main. A mesma configuração foi reexecutada nas duas estratégias: a direta dá 173,06 e a recursiva dá exatamente os 204,34 do commit antigo, o que mostra que aquele ajuste final saiu do pipeline recursivo. O script de árvore e boosting de FOODS também foi reexecutado e reproduz os CSVs versionados.
 - **Relatório de FOODS (árvore e boosting):** rascunho de `part3/relatorio_kauan.md` a partir do script, dos CSVs e de uma análise de resíduos sobre as previsões.
 - **Conclusão:** rascunho de `part4/conclusao.md` com a comparação de linear, árvore e rede nas três séries, montada a partir de `metricas.csv`.
+- **Gráficos da rede:** rascunho de `part4/src/plot_rede_diagnostico.py`, adaptado do script de árvore e boosting (`part3/src/plot_arvore_diagnostico.py`): barras de MAE, RMSE e MASE com a rede, previsões de todos os modelos e resíduos da rede com ACF, Ljung-Box e resíduo médio por dia da semana. Esta era a parte do Henzo, e ele revisa o resultado.
 - **Check:** execução do `check_task2.py --ate rede` para listar o que ainda falta.
 - **Revisão do PR de store_total (#22):** conferência do relatório de Daniel contra o código. O `recursive_mlp.py` foi reexecutado numa cópia limpa da main e reproduz o CSV versionado (diferença máxima de 9e-13). O CV do MLP também reproduz o MASE de 0,7399 (dobras 0,994, 0,706, 0,528 e 0,732), depois de indentar a linha 240 de `cross_validation.py`, que dá `IndentationError`. A conferência mostrou que o texto descrevia features, grade e uma explicação do CV que o código não sustenta, e as perguntas foram para o autor no próprio PR.
 
@@ -125,6 +126,7 @@ Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o c
 - **Conferência:** "Help me with these Daniels concerns from the series work", com a conversa do grupo e as capturas das métricas anexadas.
 - **Entrega:** "start the pr draft for my part", com a mensagem do grupo pedindo o CSV unificado de métricas, os relatórios e as previsões unificados.
 - **Revisão:** "Review daniels pr and ask him anything askable or merge it", seguido de "and update consolidation pr".
+- **Gráficos:** "Do Henzo's part and tag him for review and sign off".
 
 ## Erros corrigidos
 

@@ -120,7 +120,7 @@ Esta seção descreve o uso do Claude (Anthropic) na parte do Kauan da Task 4. O
 
 - **Gráficos (`6f0361b`).** Claude: escreveu `plot_rede_diagnostico.py`, adaptando o script de gráficos de árvore e boosting da Task 3, gerou as três figuras e conferiu que elas saem idênticas dos CSVs da consolidação. Kauan: pediu os gráficos (barras de métricas, previsões e resíduos), definiu que ficariam num PR separado da consolidação e mandou o PR para a revisão de um colega, que o revisou e fez o merge.
 - **Revisão do relatório do store_total (`9a14e80`).** Claude: conferiu o relatório contra o código (reexecutou `recursive_mlp.py`, que reproduz o CSV com diferença máxima de 9e-13 e o MASE de CV de 0,7399) e reescreveu os trechos que o código não sustenta (features, explicação do CV, a frase sobre quando a validação é lida e o lag 28). Kauan: decidiu revisar o PR do colega, escolheu o que perguntar ao autor no comentário do PR e fez o merge.
-- **Fora da tabela.** O Kauan também usou o Claude para rascunhar a integração desta entrega no PR da consolidação (`run.py`, README, `requirements.txt`), o relatório de árvore e boosting de FOODS (`part3/relatorio_kauan.md`) e a conclusão unificada (`part4/conclusao.md`). Esses commits não levam o trailer de coautoria, e o apoio foi do mesmo tipo: o Claude rascunhou, e o escopo e as decisões foram do Kauan.
+- **Fora da tabela.** O Kauan também usou o Claude para rascunhar a integração desta entrega no PR da consolidação (`run.py`, README, `requirements.txt`), o relatório de árvore e boosting de FOODS (`part3/relatorio_kauan.md`) e a conclusão unificada (`part4/conclusao.md`). Sem resposta da Gabi sobre a rede de HOBBIES, o Kauan decidiu seguir sem esperar, e o Claude fez a integração: juntou a branch dela, corrigiu o script da LSTM, que gravava sempre nos arquivos do store_total, reexecutou o script final dela, que reproduz as métricas do relatório dela (MAE 75,12 e MASE 0,8227), e atualizou a conclusão e as figuras. Esses commits não levam o trailer de coautoria, e o apoio foi do mesmo tipo: o Claude rascunhou, e o escopo e as decisões foram do Kauan.
 
 ## Exemplos de prompts
 
@@ -132,7 +132,7 @@ Esta seção descreve o uso do Claude (Anthropic) na parte do Kauan da Task 4. O
 
 - **Explicação do CV no comentário de revisão (`9a14e80`):** o comentário do Claude atribuiu a diferença entre o MASE de CV (0,740) e o de validação (0,510) a uma janela de validação mais fácil. Isso não se sustentou: o naive sazonal tem MASE 1,056 na validação e 1,018 nas dobras sem o 25/12. O relatório passou a dar a faixa das dobras em vez dessa explicação.
 - **Escala do HOBBIES no relatório de FOODS:** o rascunho do Claude dizia que o HOBBIES vende cerca de 500 unidades por dia. A média da validação é 538, e o texto passou a dizer cerca de 540.
-- **`torch` fora do `requirements.txt`:** a LSTM de FOODS, que já está na main, importa `torch`, e o `requirements.txt` não o listava, então o README não bastava para refazer a rede. O `torch` entrou no `requirements.txt` e o README avisa que só as LSTMs o usam.
+- **Arquivos de saída da LSTM de HOBBIES:** o `save_outputs` do script da Gabi tinha o sufixo `_store_total` fixo, então rodar a LSTM de HOBBIES sobrescrevia as previsões e as métricas da rede do store_total, e o CSV que estava na branch dela era de uma rodada anterior ao ajuste final. O sufixo passou a vir da série, os dois arquivos do store_total voltaram ao que está na main e as previsões de HOBBIES foram regeradas com os hiperparâmetros finais.
 
 ## Responsabilidade
 

@@ -56,9 +56,9 @@ Em `store_total`, a `rede` (MAE 221,89) fica atrás do `linear` (198,89) e do `b
 
 # AI_USAGE
 
-Ferramentas usadas (Item 1): Python 3.x com scikit-learn (MLP), pandas/numpy para manipulação e joblib para paralelização do grid search. Usamos [ChatGPT / Claude / Gemini — confirmar] como apoio de redação, revisão de código e comparação de arquiteturas; nenhuma previsão ou métrica foi gerada diretamente pela IA sem execução local e verificação contra o código.
+Ferramentas usadas (Item 1): Python 3.x com scikit-learn (MLP), pandas/numpy para manipulação e joblib para paralelização do grid search. Usamos DeepSeek como apoio de redação, revisão de código e comparação de arquiteturas; nenhuma previsão ou métrica foi gerada diretamente pela IA sem execução local e verificação contra o código.
 
-Onde ajudou (item 2): features (codificação de eventos, escolha dos lags múltiplos de 7), árvore e rede (comparação MLP × LSTM × Transformer e decisão por eficiência amostral).
+Onde ajudou (item 2): features (codificação de eventos, escolha dos lags múltiplos de 7), rede (comparação MLP × LSTM × Transformer e decisão por eficiência amostral).
 
 Prompts representativos (item 3):
 
@@ -94,6 +94,5 @@ Erro corrigido (item 4):
 
 "A primeira versão padronizava série e preços com média e desvio de treino + validação concatenados. Corrigido para treino apenas, antes de gerar yhat."
 
-Se você me passar as métricas de FOODS e HOBBIES do grupo, eu fecho os dois blocos com placeholders resolvidos e escrevo a frase final de derrota/ausência de derrota.
 
 Responsabilidade (Item 5): O grupo assume responsabilidade integral pelo código, pelas previsões e pelas métricas entregues. Todas as sugestões da IA foram revisadas, executadas e validadas contra o código antes de entrar no relatório. Os erros listados no item 4 foram identificados e corrigidos pelo grupo. Nenhuma métrica foi copiada de resposta de IA sem reprodução local.

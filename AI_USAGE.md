@@ -108,7 +108,7 @@ Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o c
 
 ## Ferramentas utilizadas
 
-- Claude Code (Anthropic), como apoio na integração: leitura das branches, conferência de números e rascunho de trechos do `run.py`, do README, do relatório de FOODS e da conclusão.
+- Claude Code (Anthropic), como apoio na integração: leitura das branches, conferência de números, revisão de PR e rascunho de trechos do `run.py`, do README, do relatório de FOODS e da conclusão.
 
 ## Onde ajudou
 
@@ -118,16 +118,19 @@ Esta seção cobre a integração da entrega da rede (`run.py`, `README.md`, o c
 - **Relatório de FOODS (árvore e boosting):** rascunho de `part3/relatorio_kauan.md` a partir do script, dos CSVs e de uma análise de resíduos sobre as previsões.
 - **Conclusão:** rascunho de `part4/conclusao.md` com a comparação de linear, árvore e rede nas três séries, montada a partir de `metricas.csv`.
 - **Check:** execução do `check_task2.py --ate rede` para listar o que ainda falta.
+- **Revisão do PR de store_total (#22):** conferência do relatório de Daniel contra o código. O `recursive_mlp.py` foi reexecutado numa cópia limpa da main e reproduz o CSV versionado (diferença máxima de 9e-13). O CV do MLP também reproduz o MASE de 0,7399 (dobras 0,994, 0,706, 0,528 e 0,732), depois de indentar a linha 240 de `cross_validation.py`, que dá `IndentationError`. A conferência mostrou que o texto descrevia features, grade e uma explicação do CV que o código não sustenta, e as perguntas foram para o autor no próprio PR.
 
 ## Exemplos de prompts
 
 - **Conferência:** "Help me with these Daniels concerns from the series work", com a conversa do grupo e as capturas das métricas anexadas.
 - **Entrega:** "start the pr draft for my part", com a mensagem do grupo pedindo o CSV unificado de métricas, os relatórios e as previsões unificados.
+- **Revisão:** "Review daniels pr and ask him anything askable or merge it", seguido de "and update consolidation pr".
 
 ## Erros corrigidos
 
 - **Escala do HOBBIES no relatório de FOODS:** o rascunho dizia que o HOBBIES vende cerca de 500 unidades por dia. A média da validação é 538, e o texto passou a dizer cerca de 540.
 - **Comentário do script de FOODS:** o cabeçalho de `model_direto_foods.py` dizia que os hiperparâmetros eram o "meio das grades do HOBBIES", mas `max_depth=8` e `min_samples_leaf=10` da árvore estão nas pontas das grades. O comentário passou a dizer só que são valores das grades, sem mudar nenhum resultado.
+- **`torch` fora do `requirements.txt`:** a LSTM de FOODS, que já está na main, importa `torch`, e o `requirements.txt` não o listava, então o README não bastava para refazer a rede. O `torch` entrou no `requirements.txt` e o README avisa que só as LSTMs o usam.
 
 ## Responsabilidade
 

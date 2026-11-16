@@ -30,6 +30,8 @@ Para facilidade, vamos usar apenas o pip para instalar as dependências listadas
 pip install -r requirements.txt
 ```
 
+O `torch` só é usado para refazer as LSTMs de FOODS e HOBBIES. O `run.py` lê os CSVs versionados e não precisa dele.
+
 ## Rodando arquivo `run.py`
 
 Da raiz do repo, com o ambiente virtual criado e ativado, o comando abaixo instala as dependências e reproduz `previsoes_validacao.csv` e `metricas.csv` (MAE, RMSE e MASE na validação, 28 dias):

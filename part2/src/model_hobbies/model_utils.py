@@ -41,8 +41,8 @@ def save_outputs(
     model_name: str,
     output_dir=OUTPUT_DIR,
 ):
-    predictions_path = output_dir / f'previsoes_{model_name}_store_total.csv'
-    metrics_path = output_dir / f'metricas_{model_name}_store_total.csv'
+    predictions_path = output_dir / f'previsoes_{model_name}_{SERIE}.csv'
+    metrics_path = output_dir / f'metricas_{model_name}_{SERIE}.csv'
     
     pd.DataFrame({
         "date": val_dates.strftime("%Y-%m-%d"), "series": SERIE, "modelo": model_name, "yhat": y_hat

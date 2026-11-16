@@ -57,14 +57,14 @@ Cada série tem o próprio ajuste. O CSV de previsões de cada modelo tem as col
 | Classe | Série | Arquivo | Script |
 |---|---|---|---|
 | `linear` | FOODS | `part2/projeto-task2/linear_foods_model/previsoes_validacao_foods.csv` | `part2/projeto-task2/linear_foods_model/linear_foods.py` |
-| `linear` | HOBBIES | `part2/outputs/previsoes_linear_direto_HOBBIES.csv` | `part2/src/model_direto_hobbies.py` |
+| `linear` | HOBBIES | `part2/outputs/previsoes_linear_direto_HOBBIES.csv` | `part2/src/model_hobbies/linear_direto.py` |
 | `linear` | store_total | `part2/outputs/previsoes_linear_store_total.csv` | `part2/src/model_store_total/models/linear.py` |
 | `arvore`, `boosting` | HOBBIES | `part3/outputs/previsoes_direto_HOBBIES.csv` | `part3/src/hobbies_model/model_direto_hobbies.py` |
 | `arvore` | store_total | `part3/outputs/previsoes_arvore_store_total.csv` | `part2/src/model_store_total/models/tree_boost_grid_search.py` |
 | `boosting` | store_total | `part3/outputs/previsoes_boosting_store_total.csv` | `part2/src/model_store_total/models/tree_boost_grid_search.py` |
 | `arvore`, `boosting` | FOODS | `part3/outputs/previsoes_direto_FOODS.csv` | `part3/src/foods_model/model_direto_foods.py` |
 | `rede` | FOODS | `part3/src/rede_foods/previsoes_validacao_foods.csv` | `part3/src/rede_foods/main.py` |
-| `rede` | HOBBIES | `part4/outputs/previsoes_rede_HOBBIES.csv` | `part2/src/model_hobbies/lstm/` |
+| `rede` | HOBBIES | `part4/outputs/previsoes_rede_HOBBIES.csv` | `part2/src/model_hobbies/lstm/recursive_lstm.py` |
 | `rede` | store_total | `part4/outputs/previsoes_rede_store_total.csv` | `part2/src/model_store_total/models/mlp/recursive_mlp.py` |
 
 No HOBBIES entra a estratégia direta, tanto no linear quanto em árvore e boosting. No store_total a estratégia sai da validação cruzada temporal dentro do treino (árvore: recursiva; boosting: direta; ver `part3/outputs/cv_store_total.csv`). Os arquivos `recursivo_` foram o teste da outra estratégia e não entram em `metricas.csv`. Em FOODS, árvore e boosting usam a mesma estrutura do HOBBIES com hiperparâmetros fixos a priori, sem busca.
